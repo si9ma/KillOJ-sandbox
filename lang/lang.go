@@ -42,4 +42,3 @@ func GetCommand(langStr,src string) (cmd *exec.Cmd,err error)  {
 
 	return
 }
-
