@@ -58,12 +58,12 @@ var compileCmd = cli.Command{
 				}
 			}
 
-			resultStr,_ := json.Marshal(result)
-			fmt.Println(resultStr)
+			res,_ := json.Marshal(result)
+			fmt.Println(string(res))
 		}()
 
 		// lang/dir/src is required
-		if err := checkCmdStrArgsExist(ctx,[]string{"lang","dir","src"});err != nil {
+		if err = checkCmdStrArgsExist(ctx,[]string{"lang","dir","src"});err != nil {
 			return nil // return nil, handle error by self
 		}
 

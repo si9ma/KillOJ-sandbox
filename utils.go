@@ -22,14 +22,9 @@ func checkCmdStrArgsExist(ctx *cli.Context,args []string) (err error) {
 
 	for _,arg := range args {
 		if ctx.String(arg) == "" {
-			err = fmt.Errorf("%s: %q requires require %s", os.Args[0], cmdName,arg)
+			err = fmt.Errorf("%s: %q require parameter:--%s", os.Args[0], cmdName,arg)
 		}
 	}
 
-	if err != nil {
-		fmt.Printf("Incorrect Usage.\n\n")
-		cli.ShowCommandHelp(ctx, cmdName)
-		return err
-	}
-	return nil
+	return err
 }
