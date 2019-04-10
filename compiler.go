@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/si9ma/KillOJ-sandbox/lang"
 	"github.com/si9ma/KillOJ-sandbox/model"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"os/exec"
 	"syscall"
@@ -58,8 +59,28 @@ var compileCmd = cli.Command{
 				}
 			}
 
+			// success
+			if err == nil && result == nil {
+				result = &model.CompileResult{
+					Result: model.Result{
+						ResultType: model.CompileResType,
+						Status: model.SUCCESS,
+					},
+					Message: "compile success",
+				}
+			}
+
 			res,_ := json.Marshal(result)
 			fmt.Println(string(res))
+
+			// log result
+			log.WithFields(log.Fields{
+				"lang": ctx.String("lang"),
+				"src": ctx.String("src"),
+				"baseDir": ctx.String("dir"),
+				"timeout": ctx.String("timeout"),
+				"result": result,
+			},).Info("compile result")
 		}()
 
 		// lang/dir/src is required
