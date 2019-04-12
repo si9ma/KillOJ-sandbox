@@ -10,5 +10,7 @@ const COMPILE_TIME_LIMIT_ERR = 103
 const RUNNER_ERR = 201
 
 // 3xx: container error (error from container)
+const CONTAINER_ERR = 301
 
 // 4xx: run error (error from program run in container)
+const APP_ERR = 401

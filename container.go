@@ -39,6 +39,10 @@ var runCmd = cli.Command{
 			Name: "seccomp",
 			Usage: "whether or not enable seccomp",
 		},
+		cli.StringFlag{
+			Name: "cmd",
+			Usage: "the command name run in container",
+		},
 		cli.IntFlag{
 			Name:  "timeout",
 			Value: 2000,
@@ -79,13 +83,15 @@ var runCmd = cli.Command{
 				"baseDir": ctx.String("dir"),
 				"memory": ctx.String("memory"),
 				"timeout": ctx.String("timeout"),
+				"scmp": ctx.String("scmp"),
+				"cmdStr": ctx.String("cmdStr"),
 				"result": result,
 			},).Info("run result")
 
 		}()
 
 		// input/dir/expected is required
-		if err = checkCmdStrArgsExist(ctx,[]string{"input","dir","expected"});err != nil {
+		if err = checkCmdStrArgsExist(ctx,[]string{"input","dir","expected","cmd"});err != nil {
 			return nil // return nil, handle error by self
 		}
 

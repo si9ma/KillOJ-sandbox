@@ -1,15 +1,32 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/si9ma/KillOJ-sandbox/model"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	libseccomp "github.com/seccomp/libseccomp-golang"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
+	"time"
 )
 
-const hostName4Container  = "kbox"
+var seccompMap = map[string][]string {
+	"default": {
+		"access","arch_prctl","brk","clone","close","execve","exit_group","fcntl","fstat",
+		"futex","getdents","getpid","getuid","ioctl","lstat","mmap","mprotect","open","openat",
+		"pause","pipe2","poll","read","rt_sigaction","rt_sigprocmask","rt_sigreturn","select",
+		"setuid","setxattr","signalfd4","stat","statfs","statfs64","swapoff","symlink",
+		"sync_file_range","sysfs","tgkill","timerfd_create","uname","ustat","utime","wait4","waitid","write",
+	},
+}
+
+var RUNERR error
 
 var initCmd = cli.Command{
 	Name:  "init",
@@ -26,6 +43,10 @@ var initCmd = cli.Command{
 			Name:  "base-dir,dir",
 			Value: "",
 			Usage: "base directory of source code",
+		},
+		cli.StringFlag{
+			Name: "cmd",
+			Usage: "the command name run in container",
 		},
 		cli.StringFlag{
 			Name:  "expected",
@@ -48,34 +69,153 @@ var initCmd = cli.Command{
 		},
 	},
 	Action: func(ctx *cli.Context) error {
-		var err error
-		var result *model.RunResult
-		input := ctx.String("input")
-		dir := ctx.String("dir")
-		expected := ctx.String("expected")
-		timeout := ctx.String("timeout")
-		memory := ctx.String("memory")
-		scmp := ctx.Bool("seccomp")
-
-		// handle result and error
-		defer func() {
-
-		}()
+		app := NewApp(ctx)
+		defer app.HandleResult()
 
 		// init namespace
-		if err = initNamespace(dir);err != nil {
+		if app.err = initNamespace(app.dir);app.err != nil {
+			return nil // return nil, handle error by self
+		}
+
+		// set rlimit
+		// memory limit
+		memLimit := app.memory * 1024
+		if app.err = syscall.Setrlimit(syscall.RLIMIT_AS,&syscall.Rlimit{Max:memLimit,Cur:memLimit});app.err != nil {
+			return nil // return nil, handle error by self
+		}
+		// max file size limit, use to disable create file
+		if app.err = syscall.Setrlimit(syscall.RLIMIT_FSIZE,&syscall.Rlimit{Max:0,Cur:0});app.err != nil {
 			return nil // return nil, handle error by self
 		}
 
 		// when seccomp is enabled
-		if scmp {
+		if app.scmp {
+			var scmpFilter *libseccomp.ScmpFilter
+			if scmpFilter,app.err = enableSeccomp("default");app.err != nil {
+				return nil
+			}
+			if scmpFilter != nil {
+				defer scmpFilter.Release()
+			}
 		}
 
-		if err := syscall.Setrlimit(syscall.RLIMIT_AS,&syscall.Rlimit{Max:1,Cur:1});err != nil {
-			return err
+		// time limit
+		time.AfterFunc(time.Duration(app.timeout)*time.Millisecond, func() {
+			_ = syscall.Kill(-app.command.Process.Pid, syscall.SIGKILL)
+		})
+
+		// run app and calculate time
+		startTime := time.Now().UnixNano() / int64(time.Millisecond)
+		if app.err = app.command.Run(); app.err != nil {
+			RUNERR = fmt.Errorf("%s",app.err.Error())
+			return nil // return nil, handle error by self
 		}
+		endTime := time.Now().UnixNano() / int64(time.Millisecond)
+		app.timeCost = endTime - startTime
+
 		return nil
 	},
+}
+
+type App struct {
+	id 		   string
+	err        error // run error
+	input      string // input of test case
+	dir        string // base dir
+	expected   string // expected of test case
+	timeout    int64 // timeout limit in ms
+	memory     uint64 // memory limit in KB
+	scmp       bool // enable sccomp
+	cmdStr     string // command of app
+	command    *exec.Cmd
+	stdOut     bytes.Buffer
+	stdErr     bytes.Buffer
+	memoryCost int64 // memory usage in KB
+	timeCost   int64 // time usage in ms
+}
+
+func NewApp(ctx *cli.Context) *App {
+	app :=  &App{
+		id: ctx.GlobalString("id"),
+		input: ctx.String("input"),
+		dir: ctx.String("dir"),
+		expected: ctx.String("expected"),
+		timeout: ctx.Int64("timeout"),
+		memory: ctx.Uint64("memory"),
+		scmp: ctx.Bool("seccomp"),
+		cmdStr: ctx.String("cmd"),
+	}
+
+	app.initCommand()
+
+	return app
+}
+
+func (app App)HandleResult()  {
+	result := model.RunResult{
+		Result: model.Result{
+			ID: app.id,
+			ResultType: model.RunResType,
+		},
+		Runtime: app.timeCost,
+		Memory: app.command.ProcessState.SysUsage().(*syscall.Rusage).Maxrss/1024,
+		Input: app.input,
+		Output: app.stdOut.String(),
+		Expected: app.expected,
+	}
+
+	if app.err != nil || app.command.ProcessState.ExitCode() != 0 {
+		app.HandleError(&result)
+	}else {
+		// success
+		if result.Output == result.Expected {
+			result.Status = model.SUCCESS
+		}
+	}
+}
+
+func (app App)Log(result model.RunResult)  {
+	resultStr,_ := json.Marshal(result)
+	fmt.Println(string(resultStr))
+
+	// log result
+	log.WithFields(log.Fields{
+		"id": app.id,
+		"input": app.input,
+		"baseDir": app.dir,
+		"memory": app.memory,
+		"timeout": app.timeout,
+		"scmp": app.scmp,
+		"cmdStr": app.cmdStr,
+		"result": result,
+	},).Info("app result")
+
+}
+
+func (app App)HandleError(result *model.RunResult)  {
+	result.Status = model.FAIL
+
+	// container error
+	if app.err != nil && app.err != RUNERR {
+		result.Errno = model.CONTAINER_ERR
+		result.Message = app.err.Error()
+		return
+	}
+}
+
+func (app App)initCommand() {
+	command := exec.Command(app.cmdStr)
+	command.Stdin = strings.NewReader(app.input)
+	command.Stdout = &app.stdOut
+	command.Stderr = &app.stdErr
+	command.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+	PS1 := fmt.Sprintf("PS1=[%s] #",appName)
+	PATH := fmt.Sprintf("PATH=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/root/bin")
+	command.Env = []string{PS1,PATH}
+
+	app.command = command
 }
 
 func initNamespace(newRoot string) error {
@@ -83,7 +223,7 @@ func initNamespace(newRoot string) error {
 		return fmt.Errorf("init namespace:%s",err.Error())
 	}
 
-	if err := syscall.Sethostname([]byte(hostName4Container)); err != nil {
+	if err := syscall.Sethostname([]byte(appName)); err != nil {
 		return fmt.Errorf("init namespace:%s",err.Error())
 	}
 
@@ -127,4 +267,55 @@ func pivotRoot(newRoot string) error {
 	}
 
 	return nil
+}
+
+func enableSeccomp(config string) (*libseccomp.ScmpFilter,error) {
+	var syscalls []string
+	if val,ok := seccompMap[config]; !ok {
+		return nil,fmt.Errorf("seccomp:config %s is not exist",config)
+	}else {
+		syscalls = val
+	}
+
+	// new filter
+	filter,err := libseccomp.NewFilter(libseccomp.ActErrno.SetReturnCode(int16(syscall.EPERM)))
+	if err != nil {
+		return nil,fmt.Errorf("seccomp:%s",err.Error())
+	}
+
+	// add arch
+	archs := []string{"x86","x86_64","x32"}
+	for _,arch := range archs {
+		scmpArch, err := libseccomp.GetArchFromString(arch)
+		if err != nil {
+			return nil,fmt.Errorf("seccomp:%s",err.Error())
+		}
+
+		if err := filter.AddArch(scmpArch); err != nil {
+			return nil,fmt.Errorf("seccomp:%s",err.Error())
+		}
+	}
+
+	// set No New Privileges bit
+	if err := filter.SetNoNewPrivsBit(true); err != nil {
+		return nil,fmt.Errorf("seccomp:%s",err.Error())
+	}
+
+	// add whitelist rule
+	for _, item := range syscalls {
+		syscallID, err := libseccomp.GetSyscallFromName(item)
+		if err != nil {
+			return nil,fmt.Errorf("seccomp:%s",err)
+		}
+		if err := filter.AddRule(syscallID, libseccomp.ActAllow);err != nil {
+			return nil,fmt.Errorf("seccomp:%s",err)
+		}
+	}
+
+	// load
+	if err := filter.Load();err != nil {
+		return nil,fmt.Errorf("seccomp:%s",err.Error())
+	}
+
+	return filter,nil
 }

@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	appName = "kbox"
 	usage      = `sandbox for KillOJ(https://github.com/si9ma/KillOJ)
 
 kbox is a sandbox for KillOJ, kbox is used to compile and run source code submit by user`
@@ -16,7 +17,7 @@ kbox is a sandbox for KillOJ, kbox is used to compile and run source code submit
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "kbox"
+	app.Name = appName
 	app.Usage = usage
 	app.Version = "1.0.0"
 
