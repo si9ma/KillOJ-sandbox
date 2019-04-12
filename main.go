@@ -36,6 +36,10 @@ func main() {
 			Usage: "set the format used by logs ('text' (default), or 'json')",
 		},
 		cli.StringFlag{
+			Name: "id",
+			Usage: "id of this deal",
+		},
+		cli.StringFlag{
 			Name:  "rootless",
 			Value: "auto",
 			Usage: "ignore cgroup permission errors ('true', 'false', or 'auto')",
@@ -47,6 +51,8 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		compileCmd,
+		runCmd,
+		initCmd,
 	}
 
 	app.Before = func(context *cli.Context) error {

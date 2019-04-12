@@ -37,7 +37,7 @@ var compileCmd = cli.Command{
 		cli.IntFlag{
 			Name:  "timeout",
 			Value: 100000,
-			Usage: "compile timeout",
+			Usage: "compile timeout in milliseconds",
 		},
 	},
 	Action: func(ctx *cli.Context) error {
@@ -53,9 +53,9 @@ var compileCmd = cli.Command{
 					Result: model.Result{
 						ResultType: model.CompileResType,
 						Status: model.FAIL,
-						Errno:  model.PARMAMS_ERR,
+						Errno:  model.OUTER_COMPILER_ERR,
+						Message: err.Error(),
 					},
-					Message: err.Error(),
 				}
 			}
 
@@ -65,8 +65,8 @@ var compileCmd = cli.Command{
 					Result: model.Result{
 						ResultType: model.CompileResType,
 						Status: model.SUCCESS,
+						Message: "compile success",
 					},
-					Message: "compile success",
 				}
 			}
 
@@ -75,6 +75,7 @@ var compileCmd = cli.Command{
 
 			// log result
 			log.WithFields(log.Fields{
+				"id": ctx.GlobalString("id"),
 				"lang": ctx.String("lang"),
 				"src": ctx.String("src"),
 				"baseDir": ctx.String("dir"),
@@ -105,8 +106,8 @@ var compileCmd = cli.Command{
 					ResultType: model.CompileResType,
 					Status: model.FAIL,
 					Errno:  model.COMPILE_TIME_LIMIT_ERR,
+					Message: fmt.Sprintf("compile too long(limit %dms)",timeout),
 				},
-				Message: fmt.Sprintf("compile too long(limit %dms)",timeout),
 			}
 
 			_ = syscall.Kill(-compiler.Process.Pid, syscall.SIGKILL)
@@ -119,9 +120,9 @@ var compileCmd = cli.Command{
 					Result: model.Result{
 						ResultType: model.CompileResType,
 						Status: model.FAIL,
-						Errno:  model.COMPILE_ERR,
+						Errno:  model.INNER_COMPILER_ERR,
+						Message: stderr.String(),
 					},
-					Message: stderr.String(),
 				}
 			}
 		}
