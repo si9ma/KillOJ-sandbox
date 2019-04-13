@@ -14,3 +14,4 @@ const CONTAINER_ERR = 301
 
 // 4xx: run error (error from program run in container)
 const APP_ERR = 401
+const UNEXPECTED_RES_ERR = 402

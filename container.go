@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
-	"time"
 )
 
 var runCmd = cli.Command{
@@ -55,110 +54,104 @@ var runCmd = cli.Command{
 		},
 	},
 	Action: func(ctx *cli.Context) error {
-		var err error
-		var result *model.RunResult
-		id := ctx.GlobalString("id")
+		// create container
+		container := NewContainer(ctx)
+		if container.err != nil {
+			return nil
+		}
 
-		// handle result and error by self
-		defer func() {
-			if err != nil {
-				result = &model.RunResult{
-					Result:model.Result{
-						ID:id,
-						ResultType: model.RunResType,
-						Status: model.FAIL,
-						Errno: model.RUNNER_ERR,
-						Message: err.Error(),
-					},
-				}
-			}
+		// handle result
+		container.handleResult()
 
-			res,_ := json.Marshal(result)
-			fmt.Println(string(res))
-
-			// log result
-			log.WithFields(log.Fields{
-				"id": ctx.GlobalString("id"),
-				"input": ctx.String("input"),
-				"baseDir": ctx.String("dir"),
-				"memory": ctx.String("memory"),
-				"timeout": ctx.String("timeout"),
-				"scmp": ctx.String("scmp"),
-				"cmdStr": ctx.String("cmdStr"),
-				"result": result,
-			},).Info("run result")
-
-		}()
+		// delete cgroup
+		defer container.cgroup.Delete()
 
 		// input/dir/expected is required
-		if err = checkCmdStrArgsExist(ctx,[]string{"input","dir","expected","cmd"});err != nil {
+		if container.err = checkCmdStrArgsExist(ctx,[]string{"input","dir","expected","cmd"});container.err != nil {
 			return nil // return nil, handle error by self
 		}
-
-		// use cgroup to limit resource
-		memory := ctx.Int64("memory")
-		var cgroup *cgroups.Cgroup
-		if cgroup,err = getCgroup(memory); err != nil {
-			return nil // return nil, handle error by self
-		}
-		defer func() {
-			err = cgroup.Delete()
-		}()
 
 		// start container
-		container := getContainer(ctx)
-		if err = container.Start(); err != nil {
+		if container.err = container.command.Start(); container.err != nil {
 			return nil
 		}
 
 		// add container process to cgroup
-		if err = cgroup.Add(container.Process.Pid);err != nil {
+		if container.err = container.cgroup.Add(container.command.Process.Pid);container.err != nil {
 			return nil // return nil, handle error by self
 		}
-		fmt.Println("container",time.Now().Nanosecond())
 
 		// wait container exit
-		err = container.Wait()
+		container.err = container.command.Wait()
 
 		return nil // return nil, handle error by self
 	},
 }
 
-// memsw_limit: (memory + swap) limit in bytes
-func getCgroup(memswLimit int64) (*cgroups.Cgroup,error) {
-	var path string
-
-	// random cgroup path
-	if uid,err := uuid.NewV4();err != nil {
-		return nil,err
-	}else {
-		path = "/" + uid.String()
-	}
-
-	// new cgroup
-	var cpuQuota int64 = 10 // 10ms
-	var kernelMem int64 = 64000 // 64m
-	var disableOOMKiller bool = false // kill process when oom
-	var pidsLimit int64 = 64
-	cgroup,err := cgroups.New(path,cgroups.Resource{
-		CPU: &cgroups.CPU{
-			Quota: &cpuQuota,
-		},
-		Memory: &cgroups.Memory{
-			Limit: &memswLimit,
-			Swap: &memswLimit,
-			DisableOOMKiller: &disableOOMKiller,
-			Kernel: &kernelMem,
-		},
-		Pids: &cgroups.Pids{
-			Limit: &pidsLimit,
-		},
-	})
-
-	return cgroup,err
+type Container struct {
+	id string
+	err error
+	input string // input of test case
+	baseDir string // base directory
+	memory int64 // memory limit in kB
+	timeout int64 // time limit in ms
+	scmp bool // enable seccomp
+	expected string // expected of test case
+	cmdStr string // command path
+	command *exec.Cmd
+	cgroup *cgroups.Cgroup
 }
 
-func getContainer(ctx *cli.Context) *exec.Cmd {
+func NewContainer(ctx *cli.Context) *Container {
+	container := &Container{
+		id: ctx.GlobalString("id"),
+		input: ctx.String("input"),
+		baseDir: ctx.String("dir"),
+		expected: ctx.String("expected"),
+		timeout: ctx.Int64("timeout"),
+		memory: ctx.Int64("memory"),
+		scmp: ctx.Bool("seccomp"),
+		cmdStr: ctx.String("cmd"),
+	}
+
+	container.initCommand()
+	if err := container.initCGroup(container.memory); err != nil {
+		container.err = err // save error to container
+	}
+
+	return container
+}
+
+func (c *Container)handleResult()  {
+	if c.err != nil {
+		result := &model.RunResult{
+			Result:model.Result{
+				ID:c.id,
+				ResultType: model.RunResType,
+				Status: model.FAIL,
+				Errno: model.RUNNER_ERR,
+				Message: err.Error(),
+			},
+		}
+	}
+
+	res,_ := json.Marshal(result)
+	fmt.Println(string(res))
+
+	// log result
+	log.WithFields(log.Fields{
+		"id": ctx.GlobalString("id"),
+		"input": ctx.String("input"),
+		"baseDir": ctx.String("dir"),
+		"memory": ctx.String("memory"),
+		"timeout": ctx.String("timeout"),
+		"scmp": ctx.String("scmp"),
+		"cmdStr": ctx.String("cmdStr"),
+		"result": result,
+	},).Info("run result")
+}
+
+func (c *Container)initCommand() {
 	args := getInitArgs()
 	container := exec.Command("/proc/self/exe",args...)
 	container.Args[0] = os.Args[0]
@@ -187,7 +180,42 @@ func getContainer(ctx *cli.Context) *exec.Cmd {
 		},
 	}
 
-	return container
+	c.command = container
+}
+
+// memsw_limit: (memory + swap) limit in bytes
+func (c *Container)initCGroup(memswLimit int64) error {
+	var path string
+
+	// random cgroup path
+	if uid,err := uuid.NewV4();err != nil {
+		return err
+	}else {
+		path = "/" + uid.String()
+	}
+
+	// new cgroup
+	var cpuQuota int64 = 10 // 10ms
+	var kernelMem int64 = 64000 // 64m
+	var disableOOMKiller bool = false // kill process when oom
+	var pidsLimit int64 = 64
+	cgroup,err := cgroups.New(path,cgroups.Resource{
+		CPU: &cgroups.CPU{
+			Quota: &cpuQuota,
+		},
+		Memory: &cgroups.Memory{
+			Limit: &memswLimit,
+			Swap: &memswLimit,
+			DisableOOMKiller: &disableOOMKiller,
+			Kernel: &kernelMem,
+		},
+		Pids: &cgroups.Pids{
+			Limit: &pidsLimit,
+		},
+	})
+	c.cgroup = cgroup
+
+	return err
 }
 
 func getInitArgs() []string {

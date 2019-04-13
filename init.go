@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	libseccomp "github.com/seccomp/libseccomp-golang"
 	"github.com/si9ma/KillOJ-sandbox/model"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	libseccomp "github.com/seccomp/libseccomp-golang"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,6 +23,9 @@ var seccompMap = map[string][]string {
 		"pause","pipe2","poll","read","rt_sigaction","rt_sigprocmask","rt_sigreturn","select",
 		"setuid","setxattr","signalfd4","stat","statfs","statfs64","swapoff","symlink",
 		"sync_file_range","sysfs","tgkill","timerfd_create","uname","ustat","utime","wait4","waitid","write",
+	},
+	"test":{
+		"alarm",
 	},
 }
 
@@ -79,19 +82,19 @@ var initCmd = cli.Command{
 
 		// set rlimit
 		// memory limit
-		memLimit := app.memory * 1024
-		if app.err = syscall.Setrlimit(syscall.RLIMIT_AS,&syscall.Rlimit{Max:memLimit,Cur:memLimit});app.err != nil {
-			return nil // return nil, handle error by self
-		}
-		// max file size limit, use to disable create file
-		if app.err = syscall.Setrlimit(syscall.RLIMIT_FSIZE,&syscall.Rlimit{Max:0,Cur:0});app.err != nil {
-			return nil // return nil, handle error by self
-		}
+		//memLimit := app.memory * 1024
+		//if app.err = syscall.Setrlimit(syscall.RLIMIT_AS,&syscall.Rlimit{Max:memLimit,Cur:memLimit});app.err != nil {
+		//	return nil // return nil, handle error by self
+		//}
+		//// max file size limit, use to disable create file
+		//if app.err = syscall.Setrlimit(syscall.RLIMIT_FSIZE,&syscall.Rlimit{Max:0,Cur:0});app.err != nil {
+		//	return nil // return nil, handle error by self
+		//}
 
 		// when seccomp is enabled
 		if app.scmp {
 			var scmpFilter *libseccomp.ScmpFilter
-			if scmpFilter,app.err = enableSeccomp("default");app.err != nil {
+			if scmpFilter,app.err = enableSeccomp("test");app.err != nil {
 				return nil
 			}
 			if scmpFilter != nil {
@@ -101,15 +104,19 @@ var initCmd = cli.Command{
 
 		// time limit
 		time.AfterFunc(time.Duration(app.timeout)*time.Millisecond, func() {
-			_ = syscall.Kill(-app.command.Process.Pid, syscall.SIGKILL)
+			if app.command.Process != nil {
+				_ = syscall.Kill(-app.command.Process.Pid, syscall.SIGKILL)
+			}
 		})
 
 		// run app and calculate time
 		startTime := time.Now().UnixNano() / int64(time.Millisecond)
 		if app.err = app.command.Run(); app.err != nil {
 			RUNERR = fmt.Errorf("%s",app.err.Error())
+			app.err = RUNERR
 			return nil // return nil, handle error by self
 		}
+		app.done = true // done
 		endTime := time.Now().UnixNano() / int64(time.Millisecond)
 		app.timeCost = endTime - startTime
 
@@ -119,6 +126,7 @@ var initCmd = cli.Command{
 
 type App struct {
 	id 		   string
+	done 		bool // if run app done
 	err        error // run error
 	input      string // input of test case
 	dir        string // base dir
@@ -151,30 +159,40 @@ func NewApp(ctx *cli.Context) *App {
 	return app
 }
 
-func (app App)HandleResult()  {
+func (app *App)HandleResult()  {
 	result := model.RunResult{
 		Result: model.Result{
 			ID: app.id,
 			ResultType: model.RunResType,
 		},
 		Runtime: app.timeCost,
-		Memory: app.command.ProcessState.SysUsage().(*syscall.Rusage).Maxrss/1024,
 		Input: app.input,
 		Output: app.stdOut.String(),
 		Expected: app.expected,
 	}
 
-	if app.err != nil || app.command.ProcessState.ExitCode() != 0 {
+	// if done, calculate memory cost
+	if app.done {
+		result.Memory = app.command.ProcessState.SysUsage().(*syscall.Rusage).Maxrss/1024
+	}
+
+	if app.err != nil || app.done && app.command.ProcessState.ExitCode() != 0 {
 		app.HandleError(&result)
 	}else {
 		// success
 		if result.Output == result.Expected {
 			result.Status = model.SUCCESS
+		}else {
+			result.Status = model.FAIL
+			result.Errno = model.UNEXPECTED_RES_ERR
+			result.Message = "output is unexpected"
 		}
 	}
+
+	app.Log(result)
 }
 
-func (app App)Log(result model.RunResult)  {
+func (app *App)Log(result model.RunResult)  {
 	resultStr,_ := json.Marshal(result)
 	fmt.Println(string(resultStr))
 
@@ -192,7 +210,7 @@ func (app App)Log(result model.RunResult)  {
 
 }
 
-func (app App)HandleError(result *model.RunResult)  {
+func (app *App)HandleError(result *model.RunResult)  {
 	result.Status = model.FAIL
 
 	// container error
@@ -201,9 +219,15 @@ func (app App)HandleError(result *model.RunResult)  {
 		result.Message = app.err.Error()
 		return
 	}
+
+	if app.err == RUNERR {
+		result.Errno = model.APP_ERR
+		result.Message = app.err.Error()
+		return
+	}
 }
 
-func (app App)initCommand() {
+func (app *App)initCommand() {
 	command := exec.Command(app.cmdStr)
 	command.Stdin = strings.NewReader(app.input)
 	command.Stdout = &app.stdOut
@@ -278,7 +302,8 @@ func enableSeccomp(config string) (*libseccomp.ScmpFilter,error) {
 	}
 
 	// new filter
-	filter,err := libseccomp.NewFilter(libseccomp.ActErrno.SetReturnCode(int16(syscall.EPERM)))
+	//filter,err := libseccomp.NewFilter(libseccomp.ActErrno.SetReturnCode(int16(syscall.EPERM)))
+	filter,err := libseccomp.NewFilter(libseccomp.ActAllow)
 	if err != nil {
 		return nil,fmt.Errorf("seccomp:%s",err.Error())
 	}
@@ -307,7 +332,7 @@ func enableSeccomp(config string) (*libseccomp.ScmpFilter,error) {
 		if err != nil {
 			return nil,fmt.Errorf("seccomp:%s",err)
 		}
-		if err := filter.AddRule(syscallID, libseccomp.ActAllow);err != nil {
+		if err := filter.AddRule(syscallID, libseccomp.ActKillProcess);err != nil {
 			return nil,fmt.Errorf("seccomp:%s",err)
 		}
 	}

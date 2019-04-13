@@ -40,11 +40,6 @@ func main() {
 			Name: "id",
 			Usage: "id of this deal",
 		},
-		cli.StringFlag{
-			Name:  "rootless",
-			Value: "auto",
-			Usage: "ignore cgroup permission errors ('true', 'false', or 'auto')",
-		},
 		cli.BoolFlag{
 			Name:  "json-res",
 			Usage: "return result as json",
