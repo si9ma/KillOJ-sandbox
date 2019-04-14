@@ -105,7 +105,8 @@ var initCmd = cli.Command{
 		// time limit
 		time.AfterFunc(time.Duration(app.timeout)*time.Millisecond, func() {
 			if app.command.Process != nil {
-				_ = syscall.Kill(-app.command.Process.Pid, syscall.SIGKILL)
+				// use SIGUSR1 as time limit kill signal
+				_ = syscall.Kill(-app.command.Process.Pid, syscall.SIGUSR1)
 			}
 		})
 
@@ -114,19 +115,16 @@ var initCmd = cli.Command{
 		if app.err = app.command.Run(); app.err != nil {
 			RUNERR = fmt.Errorf("%s",app.err.Error())
 			app.err = RUNERR
-			return nil // return nil, handle error by self
 		}
-		app.done = true // done
 		endTime := time.Now().UnixNano() / int64(time.Millisecond)
 		app.timeCost = endTime - startTime
 
-		return nil
+		return nil // return nil, handle error by self
 	},
 }
 
 type App struct {
 	id 		   string
-	done 		bool // if run app done
 	err        error // run error
 	input      string // input of test case
 	dir        string // base dir
@@ -140,6 +138,9 @@ type App struct {
 	stdErr     bytes.Buffer
 	memoryCost int64 // memory usage in KB
 	timeCost   int64 // time usage in ms
+	rusage *syscall.Rusage
+	waitStatus syscall.WaitStatus
+	processStarted bool // if process is started
 }
 
 func NewApp(ctx *cli.Context) *App {
@@ -171,12 +172,16 @@ func (app *App)HandleResult()  {
 		Expected: app.expected,
 	}
 
-	// if done, calculate memory cost
-	if app.done {
-		result.Memory = app.command.ProcessState.SysUsage().(*syscall.Rusage).Maxrss/1024
+	// get rusage and wait status info
+	if app.command.ProcessState != nil {
+		app.processStarted = true
+		app.rusage = app.command.ProcessState.SysUsage().(*syscall.Rusage)
+		app.waitStatus = app.command.ProcessState.Sys().(syscall.WaitStatus)
+		result.Memory = app.rusage.Maxrss/1024
 	}
 
-	if app.err != nil || app.done && app.command.ProcessState.ExitCode() != 0 {
+	// error is not nil or exit status is not 0
+	if app.err != nil || app.processStarted && app.waitStatus.ExitStatus() != 0 {
 		app.HandleError(&result)
 	}else {
 		// success
@@ -204,6 +209,7 @@ func (app *App)Log(result model.RunResult)  {
 		"memory": app.memory,
 		"timeout": app.timeout,
 		"scmp": app.scmp,
+		"expected": app.expected,
 		"cmdStr": app.cmdStr,
 		"result": result,
 	},).Info("app result")
@@ -212,6 +218,23 @@ func (app *App)Log(result model.RunResult)  {
 
 func (app *App)HandleError(result *model.RunResult)  {
 	result.Status = model.FAIL
+
+	// handle kill signal
+	if app.processStarted && app.waitStatus.ExitStatus() != 0 {
+		switch app.waitStatus.Signal() {
+		case syscall.SIGSYS:
+			result.Errno = model.BAD_SYSTEMCALL
+			result.Message = "Bad System Call"
+		case syscall.SIGUSR1:
+			result.Errno = model.TIMEOUT
+			result.Message = "Time Out"
+		default:
+			goto NotSigned
+		}
+		return
+	}
+
+NotSigned:
 
 	// container error
 	if app.err != nil && app.err != RUNERR {

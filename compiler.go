@@ -121,7 +121,7 @@ var compileCmd = cli.Command{
 						ResultType: model.CompileResType,
 						Status: model.FAIL,
 						Errno:  model.INNER_COMPILER_ERR,
-						Message: stderr.String(),
+						Message: err.Error() + stderr.String(),
 					},
 				}
 			}

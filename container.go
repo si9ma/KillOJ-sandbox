@@ -61,7 +61,7 @@ var runCmd = cli.Command{
 		}
 
 		// handle result
-		container.handleResult()
+		defer container.handleResult()
 
 		// delete cgroup
 		defer container.cgroup.Delete()
@@ -83,6 +83,7 @@ var runCmd = cli.Command{
 
 		// wait container exit
 		container.err = container.command.Wait()
+		container.done = true
 
 		return nil // return nil, handle error by self
 	},
@@ -100,6 +101,7 @@ type Container struct {
 	cmdStr string // command path
 	command *exec.Cmd
 	cgroup *cgroups.Cgroup
+	done bool // is container done
 }
 
 func NewContainer(ctx *cli.Context) *Container {
@@ -123,30 +125,42 @@ func NewContainer(ctx *cli.Context) *Container {
 }
 
 func (c *Container)handleResult()  {
-	if c.err != nil {
-		result := &model.RunResult{
-			Result:model.Result{
-				ID:c.id,
-				ResultType: model.RunResType,
-				Status: model.FAIL,
-				Errno: model.RUNNER_ERR,
-				Message: err.Error(),
-			},
-		}
+	result := model.RunResult{
+		Result: model.Result{
+			ID: c.id,
+			ResultType: model.RunResType,
+		},
 	}
 
-	res,_ := json.Marshal(result)
-	fmt.Println(string(res))
+	// error is not nil or exit code not 0
+	if c.err != nil || c.done && c.command.ProcessState.ExitCode() != 0{
+		result.Status = model.FAIL
+		if c.err == nil {
+			// exit code not 0
+			// todo judge with exit code
+			result.Errno = model.OUT_OF_MEMORY
+			result.Message = "out of memory"
+		}else {
+			result.Errno = model.RUNNER_ERR
+			result.Message = c.err.Error()
+		}
+
+		// print result just when error
+		// success result come from container
+		res,_ := json.Marshal(result)
+		fmt.Println(string(res))
+	}
 
 	// log result
 	log.WithFields(log.Fields{
-		"id": ctx.GlobalString("id"),
-		"input": ctx.String("input"),
-		"baseDir": ctx.String("dir"),
-		"memory": ctx.String("memory"),
-		"timeout": ctx.String("timeout"),
-		"scmp": ctx.String("scmp"),
-		"cmdStr": ctx.String("cmdStr"),
+		"id": c.id,
+		"input": c.input,
+		"baseDir": c.baseDir,
+		"memory": c.memory,
+		"timeout": c.timeout,
+		"scmp": c.scmp,
+		"cmdStr": c.cmdStr,
+		"expected": c.expected,
 		"result": result,
 	},).Info("run result")
 }
