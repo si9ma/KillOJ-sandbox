@@ -24,6 +24,11 @@ type SubSystem interface {
 	add(path string,pid int) error // add process to cgroup
 }
 
+type cgroupFile struct {
+	name string // file name
+	content string // file content
+}
+
 // new cgroup
 func New(path string,resource Resource) (*Cgroup,error) {
 	cgroup := &Cgroup{

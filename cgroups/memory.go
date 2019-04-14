@@ -26,9 +26,9 @@ func (m Memory)create(path string) error  {
 	if err := os.MkdirAll(cgMemoryPath,os.ModePerm); err != nil {
 		return fmt.Errorf("cgroups:%s",err.Error())
 	}
-	mapping := m.getMapping()
+	cfg := m.getConfig()
 
-	return writeMap(cgMemoryPath,mapping)
+	return writeCgroupFiles(cgMemoryPath,cfg)
 }
 
 func (m Memory)delete(path string) error  {
@@ -41,26 +41,45 @@ func (m Memory)add(path string,pid int) error  {
 	return addPid(cgMemoryPath,pid)
 }
 
-func (m Memory)getMapping() map[string]string {
-	mapping := make(map[string]string)
+func (m Memory) getConfig() []cgroupFile {
+	cfg := make([]cgroupFile,0)
 
 	if m.Limit != nil {
-		mapping["memory.limit_in_bytes"] = strconv.FormatInt(*m.Limit,10) + "K"
+		file := cgroupFile{
+			name:"memory.limit_in_bytes" ,
+			content: strconv.FormatInt(*m.Limit,10) + "K",
+		}
+		cfg = append(cfg,file)
 	}
+
 	if m.Swap != nil {
-		mapping["memory.memsw.limit_in_bytes"] = strconv.FormatInt(*m.Swap,10) + "K"
+		file := cgroupFile{
+			name:"memory.memsw.limit_in_bytes" ,
+			content: strconv.FormatInt(*m.Swap,10) + "K",
+		}
+		cfg = append(cfg,file)
 	}
+
 	if m.Kernel != nil {
-		mapping["memory.kmem.limit_in_bytes"] = strconv.FormatInt(*m.Kernel,10) + "K"
+		file := cgroupFile{
+			name:"memory.kmem.limit_in_bytes" ,
+			content: strconv.FormatInt(*m.Kernel,10) + "K",
+		}
+		cfg = append(cfg,file)
 	}
+
 	if m.DisableOOMKiller != nil {
 		value := 0
 		if *m.DisableOOMKiller {
 			value = 1
 		}
 
-		mapping["memory.oom_control"] = strconv.Itoa(value)
+		file := cgroupFile{
+			name:"memory.oom_control" ,
+			content: strconv.Itoa(value),
+		}
+		cfg = append(cfg,file)
 	}
 
-	return mapping
+	return cfg
 }

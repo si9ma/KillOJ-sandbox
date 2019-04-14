@@ -10,10 +10,10 @@ import (
 	"syscall"
 )
 
-func writeMap(dir string,fileMap map[string]string) error {
-	for key, value := range fileMap {
-		path := filepath.Join(dir, key)
-		if err := ioutil.WriteFile(path, []byte(value), defaultPerm); err != nil {
+func writeCgroupFiles(dir string,cgroupFiles []cgroupFile) error {
+	for _, file := range cgroupFiles {
+		path := filepath.Join(dir, file.name)
+		if err := ioutil.WriteFile(path, []byte(file.content), defaultPerm); err != nil {
 			return fmt.Errorf("cgroups:%s",err.Error())
 		}
 	}

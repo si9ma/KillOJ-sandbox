@@ -20,9 +20,9 @@ func (p Pids)create(path string) error  {
 	if err := os.MkdirAll(cgPidsPath,os.ModePerm); err != nil {
 		return fmt.Errorf("cgroups:%s",err.Error())
 	}
-	mapping := p.getMapping()
+	cfg := p.getConfig()
 
-	return writeMap(cgPidsPath,mapping)
+	return writeCgroupFiles(cgPidsPath,cfg)
 }
 
 func (p Pids)delete(path string) error  {
@@ -35,13 +35,17 @@ func (p Pids)add(path string,pid int) error  {
 	return addPid(cgPidsPath,pid)
 }
 
-func (p Pids)getMapping() map[string]string {
-	mapping := make(map[string]string)
+func (p Pids) getConfig() []cgroupFile{
+	cfg := make([]cgroupFile,0)
 
 	if p.Limit != nil {
-		mapping["pids.max"] = strconv.FormatInt(*p.Limit,10)
+		file := cgroupFile{
+			name: "pids.max",
+			content: strconv.FormatInt(*p.Limit,10),
+		}
+		cfg = append(cfg,file)
 	}
 
-	return mapping
+	return cfg
 }
 

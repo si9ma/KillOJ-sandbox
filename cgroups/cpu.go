@@ -20,9 +20,9 @@ func (c CPU)create(path string) error  {
 	if err := os.MkdirAll(cgCPUPath,os.ModePerm); err != nil {
 		return fmt.Errorf("cgroups:%s",err.Error())
 	}
-	mapping := c.getMapping()
+	cfg := c.getConfig()
 
-	return writeMap(cgCPUPath,mapping)
+	return writeCgroupFiles(cgCPUPath,cfg)
 }
 
 func (c CPU)delete(path string) error  {
@@ -35,12 +35,16 @@ func (c CPU)add(path string,pid int) error  {
 	return addPid(cgCPUPath,pid)
 }
 
-func (c CPU)getMapping() map[string]string {
-	mapping := make(map[string]string)
+func (c CPU) getConfig() []cgroupFile {
+	cfg := make([]cgroupFile,0)
 
 	if c.Quota != nil {
-		mapping["cpu.cfs_quota_us"] = strconv.FormatInt(*c.Quota * 1000,10)
+		file := cgroupFile{
+			name: "cpu.cfs_quota_us",
+			content: strconv.FormatInt(*c.Quota * 1000,10),
+		}
+		cfg = append(cfg,file)
 	}
 
-	return mapping
+	return cfg
 }
