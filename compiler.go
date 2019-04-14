@@ -4,18 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os/exec"
+	"syscall"
+	"time"
+
 	"github.com/si9ma/KillOJ-sandbox/lang"
 	"github.com/si9ma/KillOJ-sandbox/model"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"os/exec"
-	"syscall"
-	"time"
 )
 
 var compileCmd = cli.Command{
-	Name:  "compile",
-	Usage: "compile source code",
+	Name:        "compile",
+	Usage:       "compile source code",
 	Description: `The compile command use to compile source code`,
 
 	Flags: []cli.Flag{
@@ -52,9 +53,9 @@ var compileCmd = cli.Command{
 				result = &model.CompileResult{
 					Result: model.Result{
 						ResultType: model.CompileResType,
-						Status: model.FAIL,
-						Errno:  model.OUTER_COMPILER_ERR,
-						Message: err.Error(),
+						Status:     model.FAIL,
+						Errno:      model.OUTER_COMPILER_ERR,
+						Message:    err.Error(),
 					},
 				}
 			}
@@ -64,33 +65,33 @@ var compileCmd = cli.Command{
 				result = &model.CompileResult{
 					Result: model.Result{
 						ResultType: model.CompileResType,
-						Status: model.SUCCESS,
-						Message: "compile success",
+						Status:     model.SUCCESS,
+						Message:    "compile success",
 					},
 				}
 			}
 
-			res,_ := json.Marshal(result)
+			res, _ := json.Marshal(result)
 			fmt.Println(string(res))
 
 			// log result
 			log.WithFields(log.Fields{
-				"id": ctx.GlobalString("id"),
-				"lang": ctx.String("lang"),
-				"src": ctx.String("src"),
+				"id":      ctx.GlobalString("id"),
+				"lang":    ctx.String("lang"),
+				"src":     ctx.String("src"),
 				"baseDir": ctx.String("dir"),
 				"timeout": ctx.String("timeout"),
-				"result": result,
-			},).Info("compile result")
+				"result":  result,
+			}).Info("compile result")
 		}()
 
 		// lang/dir/src is required
-		if err = checkCmdStrArgsExist(ctx,[]string{"lang","dir","src"});err != nil {
+		if err = checkCmdStrArgsExist(ctx, []string{"lang", "dir", "src"}); err != nil {
 			return nil // return nil, handle error by self
 		}
 
 		var compiler *exec.Cmd
-		if compiler,err = getCompiler(ctx);err != nil {
+		if compiler, err = getCompiler(ctx); err != nil {
 			return nil // return nil, handle error by self
 		}
 		var stdout, stderr bytes.Buffer
@@ -104,9 +105,9 @@ var compileCmd = cli.Command{
 			result = &model.CompileResult{
 				Result: model.Result{
 					ResultType: model.CompileResType,
-					Status: model.FAIL,
-					Errno:  model.COMPILE_TIME_LIMIT_ERR,
-					Message: fmt.Sprintf("compile too long(limit %dms)",timeout),
+					Status:     model.FAIL,
+					Errno:      model.COMPILE_TIME_LIMIT_ERR,
+					Message:    fmt.Sprintf("compile too long(limit %dms)", timeout),
 				},
 			}
 
@@ -119,9 +120,9 @@ var compileCmd = cli.Command{
 				result = &model.CompileResult{
 					Result: model.Result{
 						ResultType: model.CompileResType,
-						Status: model.FAIL,
-						Errno:  model.INNER_COMPILER_ERR,
-						Message: err.Error() + stderr.String(),
+						Status:     model.FAIL,
+						Errno:      model.INNER_COMPILER_ERR,
+						Message:    err.Error() + stderr.String(),
 					},
 				}
 			}
@@ -131,12 +132,12 @@ var compileCmd = cli.Command{
 	},
 }
 
-func getCompiler(ctx *cli.Context) (cmd *exec.Cmd,err error) {
+func getCompiler(ctx *cli.Context) (cmd *exec.Cmd, err error) {
 	langStr := ctx.String("lang")
 	baseDir := ctx.String("dir")
 	src := ctx.String("src")
 
-	if cmd,err = lang.GetCommand(langStr,src);err != nil {
+	if cmd, err = lang.GetCommand(langStr, src); err != nil {
 		return
 	}
 

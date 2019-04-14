@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"os"
 )
 
 // fatal prints the error's details
@@ -17,12 +18,12 @@ func fatal(err error) {
 }
 
 // check if arguments exist for command
-func checkCmdStrArgsExist(ctx *cli.Context,args []string) (err error) {
+func checkCmdStrArgsExist(ctx *cli.Context, args []string) (err error) {
 	cmdName := ctx.Command.Name
 
-	for _,arg := range args {
+	for _, arg := range args {
 		if ctx.String(arg) == "" {
-			err = fmt.Errorf("%s: %q require parameter:--%s", os.Args[0], cmdName,arg)
+			err = fmt.Errorf("%s: %q require parameter:--%s", os.Args[0], cmdName, arg)
 		}
 	}
 

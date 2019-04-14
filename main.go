@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"io"
 	"os"
+
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 const (
 	appName = "kbox"
-	usage      = `sandbox for KillOJ(https://github.com/si9ma/KillOJ)
+	usage   = `sandbox for KillOJ(https://github.com/si9ma/KillOJ)
 
 kbox is a sandbox for KillOJ, kbox is used to compile and run source code submit by user`
 )
@@ -37,7 +38,7 @@ func main() {
 			Usage: "set the format used by logs ('text' (default), or 'json')",
 		},
 		cli.StringFlag{
-			Name: "id",
+			Name:  "id",
 			Usage: "id of this deal",
 		},
 		cli.BoolFlag{

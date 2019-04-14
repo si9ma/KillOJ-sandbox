@@ -10,11 +10,11 @@ import (
 	"syscall"
 )
 
-func writeCgroupFiles(dir string,cgroupFiles []cgroupFile) error {
+func writeCgroupFiles(dir string, cgroupFiles []cgroupFile) error {
 	for _, file := range cgroupFiles {
 		path := filepath.Join(dir, file.name)
 		if err := ioutil.WriteFile(path, []byte(file.content), defaultPerm); err != nil {
-			return fmt.Errorf("cgroups:%s",err.Error())
+			return fmt.Errorf("cgroups:%s", err.Error())
 		}
 	}
 
@@ -27,24 +27,24 @@ func deleteDir(dir string) error {
 		return nil
 	}
 
-	if err := syscall.Rmdir(dir);err != nil {
-		return fmt.Errorf("cgroups:%s",err.Error())
+	if err := syscall.Rmdir(dir); err != nil {
+		return fmt.Errorf("cgroups:%s", err.Error())
 	}
 
 	return nil
 }
 
-func addPid(dir string,pid int) error {
-	fileName := filepath.Join(dir,"cgroup.procs")
+func addPid(dir string, pid int) error {
+	fileName := filepath.Join(dir, "cgroup.procs")
 	pidStr := strconv.Itoa(pid)
-	if err := appendFile(fileName,[]byte(pidStr),defaultPerm);err != nil {
-		return fmt.Errorf("cgroups:%s",err.Error())
+	if err := appendFile(fileName, []byte(pidStr), defaultPerm); err != nil {
+		return fmt.Errorf("cgroups:%s", err.Error())
 	}
 
 	return nil
 }
 
-func appendFile(filename string,data []byte,perm os.FileMode) error {
+func appendFile(filename string, data []byte, perm os.FileMode) error {
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, perm)
 	if err != nil {
 		return err

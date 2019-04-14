@@ -2,7 +2,7 @@ package model
 
 const (
 	CompileResType = "COMPILE"
-	RunResType = "RUN"
+	RunResType     = "RUN"
 )
 
 const (
@@ -11,11 +11,11 @@ const (
 )
 
 type Result struct {
-	ID 		string 		`json:"id"`
-	ResultType string	`json:"resType"`
-	Status int64	`json:"status"`
-	Errno int64 	`json:"errno,omitempty"`
-	Message string		`json:"msg,omitempty"`
+	ID         string `json:"id"`
+	ResultType string `json:"resType"`
+	Status     int64  `json:"status"`
+	Errno      int64  `json:"errno,omitempty"`
+	Message    string `json:"msg,omitempty"`
 }
 
 type CompileResult struct {
