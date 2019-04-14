@@ -5,12 +5,9 @@ const (
 )
 
 type Resource struct {
-	// Memory restriction configuration
-	Memory *Memory `json:"memory,omitempty"`
-	// CPU resource restriction configuration
-	CPU *CPU `json:"cpu,omitempty"`
-	// Task resource restriction configuration.
-	Pids *Pids `json:"pids,omitempty"`
+	Memory *Memory `json:"memory,omitempty"` // Memory restriction configuration
+	CPU    *CPU    `json:"cpu,omitempty"`    // CPU resource restriction configuration
+	Pids   *Pids   `json:"pids,omitempty"`   // Task resource restriction configuration.
 }
 
 type Cgroup struct {
