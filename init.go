@@ -147,6 +147,7 @@ func (app *App) HandleResult() {
 		Result: model.Result{
 			ID:         app.id,
 			ResultType: model.RunResType,
+			StdErr:     app.stdErr.String(),
 		},
 		Runtime:  app.timeCost,
 		Input:    app.input,
@@ -210,11 +211,10 @@ func (app *App) HandleError(result *model.RunResult) {
 		case syscall.SIGUSR1:
 			result.Errno = model.TIMEOUT
 			result.Message = "Time Out"
-		case syscall.SIGKILL:
+		case syscall.SIGKILL: // kill by oomkiller
 			result.Errno = model.OUT_OF_MEMORY
 			result.Message = "out of memory"
 		default:
-			fmt.Println(app.waitStatus.Signal())
 			goto NotSigned
 		}
 		return

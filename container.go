@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -93,18 +94,20 @@ var runCmd = cli.Command{
 }
 
 type Container struct {
-	id       string
-	err      error
-	input    string // input of test case
-	baseDir  string // base directory
-	memory   int64  // memory limit in kB
-	timeout  int64  // time limit in ms
-	scmp     bool   // enable seccomp
-	expected string // expected of test case
-	cmdStr   string // command path
-	command  *exec.Cmd
-	cgroup   *cgroups.Cgroup
-	done     bool // is container done
+	id         string
+	err        error
+	input      string // input of test case
+	baseDir    string // base directory
+	memory     int64  // memory limit in kB
+	timeout    int64  // time limit in ms
+	scmp       bool   // enable seccomp
+	expected   string // expected of test case
+	cmdStr     string // command path
+	command    *exec.Cmd
+	stdErr     bytes.Buffer
+	cgroup     *cgroups.Cgroup
+	waitStatus syscall.WaitStatus
+	done       bool // is container done
 }
 
 func NewContainer(ctx *cli.Context) *Container {
@@ -132,17 +135,27 @@ func (c *Container) handleResult() {
 		Result: model.Result{
 			ID:         c.id,
 			ResultType: model.RunResType,
+			StdErr:     c.stdErr.String(),
 		},
 	}
 
+	// get rusage and wait status info
+	if c.done {
+		c.waitStatus = c.command.ProcessState.Sys().(syscall.WaitStatus)
+	}
+
 	// error is not nil or exit code not 0
-	if c.err != nil || c.done && c.command.ProcessState.ExitCode() != 0 {
+	if c.err != nil || c.done && c.waitStatus.ExitStatus() != 0 {
 		result.Status = model.FAIL
-		if c.err == nil {
-			// exit code not 0
-			// todo judge with exit code
-			result.Errno = model.OUT_OF_MEMORY
-			result.Message = "out of memory"
+		if c.waitStatus.ExitStatus() != 0 {
+			switch c.waitStatus.Signal() {
+			case syscall.SIGKILL: // oom
+				result.Errno = model.OUT_OF_MEMORY
+				result.Message = "out of memory"
+			default: // not enough pid ,eg: fork bomb
+				result.Errno = model.NO_ENOUGH_PID
+				result.Message = "no enough pid"
+			}
 		} else {
 			result.Errno = model.RUNNER_ERR
 			result.Message = c.err.Error()
@@ -172,8 +185,7 @@ func (c *Container) initCommand() {
 	args := getInitArgs()
 	container := exec.Command("/proc/self/exe", args...)
 	container.Args[0] = os.Args[0]
-	container.Stdout = os.Stdout
-	container.Stderr = os.Stderr
+	container.Stderr = &c.stdErr
 	container.Stdin = os.Stdin
 	container.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWNS |
@@ -212,10 +224,13 @@ func (c *Container) initCGroup(memswLimit int64) error {
 	}
 
 	// new cgroup
-	var cpuQuota int64 = 10           // 10ms
-	var kernelMem int64 = 64000       // 64m
-	var disableOOMKiller bool = false // kill process when oom
-	var pidsLimit int64 = 64
+	var cpuQuota int64 = 10         // 10ms
+	var kernelMem int64 = 64 * 1024 // 64m
+	var disableOOMKiller = false    // kill process when oom
+
+	// 7 pid at most
+	// limit number of process to avoid fork bomb
+	var pidsLimit int64 = 7
 	var swappiness int64 = 0
 	cgroup, err := cgroups.New(path, cgroups.Resource{
 		CPU: &cgroups.CPU{

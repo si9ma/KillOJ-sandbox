@@ -16,6 +16,7 @@ type Result struct {
 	Status     int64  `json:"status"`
 	Errno      int64  `json:"errno,omitempty"`
 	Message    string `json:"msg,omitempty"`
+	StdErr     string `json:"stderr,omitempty"` // stderr from inner process
 }
 
 type CompileResult struct {
