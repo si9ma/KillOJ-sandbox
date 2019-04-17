@@ -232,7 +232,7 @@ func (c *Container) initCGroup(memswLimit int64) error {
 
 	// 7 pid at most
 	// limit number of process to avoid fork bomb
-	var pidsLimit int64 = 7
+	var pidsLimit int64 = 10
 	var swappiness int64 = 0
 	cgroup, err := cgroups.New(path, cgroups.Resource{
 		CPU: &cgroups.CPU{
