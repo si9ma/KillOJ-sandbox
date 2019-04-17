@@ -71,11 +71,7 @@ var initCmd = cli.Command{
 		// set rlimit
 		// memory limit
 		//memLimit := app.memory * 1024
-		//if app.err = syscall.Setrlimit(syscall.RLIMIT_AS,&syscall.Rlimit{Max:memLimit,Cur:memLimit});app.err != nil {
-		//	return nil // return nil, handle error by self
-		//}
-		//// max file size limit, use to disable create file
-		//if app.err = syscall.Setrlimit(syscall.RLIMIT_FSIZE,&syscall.Rlimit{Max:0,Cur:0});app.err != nil {
+		//if app.err = syscall.Setrlimit(syscall.RLIMIT_AS, &syscall.Rlimit{Max: memLimit, Cur: memLimit}); app.err != nil {
 		//	return nil // return nil, handle error by self
 		//}
 
@@ -136,7 +132,7 @@ func NewApp(ctx *cli.Context) *App {
 		dir:      ctx.String("dir"),
 		expected: ctx.String("expected"),
 		timeout:  ctx.Int64("timeout"),
-		memory:   ctx.Uint64("memory"),
+		memory:   ctx.Uint64("memory") + MemoryUsedByContainer,
 		scmp:     ctx.Bool("seccomp"),
 		cmdStr:   ctx.String("cmd"),
 	}
@@ -163,7 +159,7 @@ func (app *App) HandleResult() {
 		app.processStarted = true
 		app.rusage = app.command.ProcessState.SysUsage().(*syscall.Rusage)
 		app.waitStatus = app.command.ProcessState.Sys().(syscall.WaitStatus)
-		result.Memory = app.rusage.Maxrss / 1024
+		result.Memory = app.rusage.Maxrss
 	}
 
 	// error is not nil or exit status is not 0
@@ -214,7 +210,11 @@ func (app *App) HandleError(result *model.RunResult) {
 		case syscall.SIGUSR1:
 			result.Errno = model.TIMEOUT
 			result.Message = "Time Out"
+		case syscall.SIGKILL:
+			result.Errno = model.OUT_OF_MEMORY
+			result.Message = "out of memory"
 		default:
+			fmt.Println(app.waitStatus.Signal())
 			goto NotSigned
 		}
 		return

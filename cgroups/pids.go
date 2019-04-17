@@ -10,8 +10,7 @@ import (
 const PidsRoot = "/sys/fs/cgroup/pids/"
 
 type Pids struct {
-	// Maximum number of PIDs. Default is "no limit".
-	Limit *int64 `json:"limit"`
+	Limit *int64 `json:"limit"` // Maximum number of PIDs. Default is "no limit".
 }
 
 func (p Pids) create(path string) error {

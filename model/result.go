@@ -24,8 +24,8 @@ type CompileResult struct {
 
 type RunResult struct {
 	Result
-	Runtime  int64  `json:"runtime,omitempty"`
-	Memory   int64  `json:"memory,omitempty"`
+	Runtime  int64  `json:"runtime,omitempty"` // time usage in ms
+	Memory   int64  `json:"memory,omitempty"`  // memory usage in KB
 	Input    string `json:"input,omitempty"`
 	Output   string `json:"output,omitempty"`
 	Expected string `json:"expected,omitempty"`

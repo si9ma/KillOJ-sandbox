@@ -14,6 +14,8 @@ import (
 	"github.com/urfave/cli"
 )
 
+const MemoryUsedByContainer = 1550 // 1550KB memory used by container
+
 var runCmd = cli.Command{
 	Name:        "run",
 	Usage:       "run app in container",
@@ -112,7 +114,7 @@ func NewContainer(ctx *cli.Context) *Container {
 		baseDir:  ctx.String("dir"),
 		expected: ctx.String("expected"),
 		timeout:  ctx.Int64("timeout"),
-		memory:   ctx.Int64("memory"),
+		memory:   ctx.Int64("memory") + MemoryUsedByContainer,
 		scmp:     ctx.Bool("seccomp"),
 		cmdStr:   ctx.String("cmd"),
 	}
@@ -214,6 +216,7 @@ func (c *Container) initCGroup(memswLimit int64) error {
 	var kernelMem int64 = 64000       // 64m
 	var disableOOMKiller bool = false // kill process when oom
 	var pidsLimit int64 = 64
+	var swappiness int64 = 0
 	cgroup, err := cgroups.New(path, cgroups.Resource{
 		CPU: &cgroups.CPU{
 			Quota: &cpuQuota,
@@ -223,6 +226,7 @@ func (c *Container) initCGroup(memswLimit int64) error {
 			Swap:             &memswLimit,
 			DisableOOMKiller: &disableOOMKiller,
 			Kernel:           &kernelMem,
+			Swappiness:       &swappiness,
 		},
 		Pids: &cgroups.Pids{
 			Limit: &pidsLimit,

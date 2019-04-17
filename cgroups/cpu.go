@@ -10,8 +10,7 @@ import (
 const CPURoot = "/sys/fs/cgroup/cpu/"
 
 type CPU struct {
-	// CPU hardcap limit (in usecs). Allowed cpu time in a given period.(ms)
-	Quota *int64 `json:"quota,omitempty"`
+	Quota *int64 `json:"quota,omitempty"` // CPU hardcap limit (in usecs). Allowed cpu time in a given period.(ms)
 }
 
 func (c CPU) create(path string) error {

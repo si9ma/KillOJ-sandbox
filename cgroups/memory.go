@@ -10,14 +10,11 @@ import (
 const MemoryRoot = "/sys/fs/cgroup/memory/"
 
 type Memory struct {
-	// Memory limit (in KB).
-	Limit *int64 `json:"limit,omitempty"`
-	// Total memory limit (memory + swap).(in KB)
-	Swap *int64 `json:"swap,omitempty"`
-	// Kernel memory limit (in KB).
-	Kernel *int64 `json:"kernel,omitempty"`
-	// DisableOOMKiller disables the OOM killer for out of memory conditions
-	DisableOOMKiller *bool `json:"disableOOMKiller,omitempty"`
+	Limit            *int64 `json:"limit,omitempty"`            // Memory limit (in KB).
+	Swap             *int64 `json:"swap,omitempty"`             // Total memory limit (memory + swap).(in KB)
+	Kernel           *int64 `json:"kernel,omitempty"`           // Kernel memory limit (in KB).
+	DisableOOMKiller *bool  `json:"disableOOMKiller,omitempty"` // DisableOOMKiller disables the OOM killer for out of memory conditions
+	Swappiness       *int64 `json:"swappiness"`                 // swappiness
 }
 
 func (m Memory) create(path string) error {
@@ -64,6 +61,14 @@ func (m Memory) getConfig() []cgroupFile {
 		file := cgroupFile{
 			name:    "memory.kmem.limit_in_bytes",
 			content: strconv.FormatInt(*m.Kernel, 10) + "K",
+		}
+		cfg = append(cfg, file)
+	}
+
+	if m.Swappiness != nil {
+		file := cgroupFile{
+			name:    "memory.swappiness",
+			content: strconv.FormatInt(*m.Swappiness, 10),
 		}
 		cfg = append(cfg, file)
 	}
