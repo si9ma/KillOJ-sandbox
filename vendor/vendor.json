@@ -1,6 +1,37 @@
 {
 	"comment": "",
 	"ignore": "test",
-	"package": [],
+	"package": [
+		{
+			"checksumSHA1": "Tutue3nEgM/87jitUcYv6ODwyNE=",
+			"path": "github.com/satori/go.uuid",
+			"revision": "b2ce2384e17bbe0c6d34077efa39dbab3e09123b",
+			"revisionTime": "2018-10-28T12:50:25Z"
+		},
+		{
+			"checksumSHA1": "lwSOsz+gpDedssbV5iEElFXCzu8=",
+			"path": "github.com/seccomp/libseccomp-golang",
+			"revision": "0353a0bef25711a9c6e041351e13f350c0e075a1",
+			"revisionTime": "2017-09-21T03:16:16Z"
+		},
+		{
+			"checksumSHA1": "mB5o9lbse489BCvZGbRkarc2Xp0=",
+			"path": "github.com/sirupsen/logrus",
+			"revision": "9b3cdde74fbe9443d704467498a7dcb61a79de9b",
+			"revisionTime": "2019-04-03T09:10:19Z"
+		},
+		{
+			"checksumSHA1": "ef7fqXCjAavRO2aCl7FOKEqoqrg=",
+			"path": "github.com/urfave/cli",
+			"revision": "693af58b4d51b8fcc7f9d89576da170765980581",
+			"revisionTime": "2019-02-03T18:40:40Z"
+		},
+		{
+			"checksumSHA1": "OabEbbJcLc/KKRyAevJpUsi2Ssc=",
+			"path": "golang.org/x/sys/unix",
+			"revision": "4b34438f7a67ee5f45cc6132e2bad873a20324e9",
+			"revisionTime": "2019-04-05T15:09:22Z"
+		}
+	],
 	"rootPath": "github.com/si9ma/KillOJ-sandbox"
 }
