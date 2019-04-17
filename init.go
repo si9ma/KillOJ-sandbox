@@ -17,19 +17,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-var seccompMap = map[string][]string{
-	"default": {
-		"access", "arch_prctl", "brk", "clone", "close", "execve", "exit_group", "fcntl", "fstat",
-		"futex", "getdents", "getpid", "getuid", "ioctl", "lstat", "mmap", "mprotect", "open", "openat",
-		"pause", "pipe2", "poll", "read", "rt_sigaction", "rt_sigprocmask", "rt_sigreturn", "select",
-		"setuid", "setxattr", "signalfd4", "stat", "statfs", "statfs64", "swapoff", "symlink",
-		"sync_file_range", "sysfs", "tgkill", "timerfd_create", "uname", "ustat", "utime", "wait4", "waitid", "write",
-	},
-	"test": {
-		"alarm",
-	},
-}
-
 var RUNERR error
 
 var initCmd = cli.Command{
@@ -95,12 +82,10 @@ var initCmd = cli.Command{
 		// when seccomp is enabled
 		if app.scmp {
 			var scmpFilter *libseccomp.ScmpFilter
-			if scmpFilter, app.err = enableSeccomp("test"); app.err != nil {
+			if scmpFilter, app.err = enableSeccomp("blacklist-default", app.cmdStr); app.err != nil {
 				return nil
 			}
-			if scmpFilter != nil {
-				defer scmpFilter.Release()
-			}
+			scmpFilter.Release()
 		}
 
 		// time limit
@@ -315,56 +300,4 @@ func pivotRoot(newRoot string) error {
 	}
 
 	return nil
-}
-
-func enableSeccomp(config string) (*libseccomp.ScmpFilter, error) {
-	var syscalls []string
-	if val, ok := seccompMap[config]; !ok {
-		return nil, fmt.Errorf("seccomp:config %s is not exist", config)
-	} else {
-		syscalls = val
-	}
-
-	// new filter
-	//filter,err := libseccomp.NewFilter(libseccomp.ActErrno.SetReturnCode(int16(syscall.EPERM)))
-	filter, err := libseccomp.NewFilter(libseccomp.ActAllow)
-	if err != nil {
-		return nil, fmt.Errorf("seccomp:%s", err.Error())
-	}
-
-	// add arch
-	archs := []string{"x86", "x86_64", "x32"}
-	for _, arch := range archs {
-		scmpArch, err := libseccomp.GetArchFromString(arch)
-		if err != nil {
-			return nil, fmt.Errorf("seccomp:%s", err.Error())
-		}
-
-		if err := filter.AddArch(scmpArch); err != nil {
-			return nil, fmt.Errorf("seccomp:%s", err.Error())
-		}
-	}
-
-	// set No New Privileges bit
-	if err := filter.SetNoNewPrivsBit(true); err != nil {
-		return nil, fmt.Errorf("seccomp:%s", err.Error())
-	}
-
-	// add whitelist rule
-	for _, item := range syscalls {
-		syscallID, err := libseccomp.GetSyscallFromName(item)
-		if err != nil {
-			return nil, fmt.Errorf("seccomp:%s", err)
-		}
-		if err := filter.AddRule(syscallID, libseccomp.ActKill); err != nil {
-			return nil, fmt.Errorf("seccomp:%s", err)
-		}
-	}
-
-	// load
-	if err := filter.Load(); err != nil {
-		return nil, fmt.Errorf("seccomp:%s", err.Error())
-	}
-
-	return filter, nil
 }
