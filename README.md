@@ -2,67 +2,40 @@
 
 sandbox for KillOJ
 
-## Usage
+## Install
 
-```go
-go build -o kbox
+```bash
+make install
 ```
 
-### Compile
+OR, Docker:
 
-```go
-./kbox compile --lang="c" --src="main.c" --base-dir="./"
+```bash
+docker build -t si9ma/kbox:1.0 .
 ```
 
-## Example
+## Compile
 
-use log:
-
-```go
-./kbox --debug --log="./log" --log-format="json" compile --lang="c" --src="main.c" --base-dir="./" 
+```bash
+kbox compile --src="main.c" --base-dir="/tmp/kbox" --lang="c" 
 ```
 
-compile result:
-```json
-{
-  "resType": "COMPILE",
-  "status": 0,
-  "msg": "compile success"
-}
+OR, Docker:
+
+```bash
+docker run --rm -v "$PWD":/tmp/kbox si9ma/kbox:1.0 compile --src="main.c" --base-dir="/tmp/kbox" --lang="c" 
 ```
 
-log:
-```json
-{
-  "baseDir": "./",
-  "lang": "c",
-  "level": "info",
-  "msg": "compile result",
-  "result": {
-    "resType": "COMPILE",
-    "status": 0,
-    "msg": "compile success"
-  },
-  "src": "main.c",
-  "time": "2019-04-10T16:55:41+08:00",
-  "timeout": "100000"
-},
-{
-  "baseDir": "./",
-  "lang": "",
-  "level": "info",
-  "msg": "compile result",
-  "result": {
-    "resType": "COMPILE",
-    "status": 1,
-    "errno": 102,
-    "msg": "./kbox: \"compile\" require parameter:--lang"
-  },
-  "src": "main.c",
-  "time": "2019-04-10T16:56:53+08:00",
-  "timeout": "100000"
-}
+## Run
 
+```bash
+kbox run --dir="/tmp/kbox" --cmd="/Main" --expected="hello" --input="hello" --timeout=1000 --memory=1000 --seccomp 
+```
+
+OR, Docker
+
+```bash
+docker run --rm -v "$PWD":/tmp/kbox si9ma/kbox:1.0 run --dir="/tmp/kbox" --cmd="/Main" --expected="hello" --input="hello" --timeout=1000 --memory=1000 --seccomp 
 ```
 
 ## TODO

@@ -5,3 +5,6 @@ build:
 
 clean:
 	rm -rf kbox
+
+install:
+	go build -o $$GOPATH/bin/kbox
