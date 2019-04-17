@@ -60,12 +60,13 @@ var runCmd = cli.Command{
 	Action: func(ctx *cli.Context) error {
 		// create container
 		container := NewContainer(ctx)
-		if container.err != nil {
-			return nil
-		}
 
 		// handle result
 		defer container.handleResult()
+
+		if container.err != nil {
+			return nil
+		}
 
 		// delete cgroup
 		defer container.cgroup.Delete()
