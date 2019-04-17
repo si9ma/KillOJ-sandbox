@@ -23,7 +23,7 @@ kbox compile --src="main.c" --base-dir="/tmp/kbox" --lang="c"
 OR, Docker:
 
 ```bash
-docker run --rm -v "$PWD":/tmp/kbox si9ma/kbox:1.0 compile --src="main.c" --base-dir="/tmp/kbox" --lang="c" 
+docker run --privileged --rm -v "$PWD":/tmp/kbox si9ma/kbox:1.0 compile --src="main.c" --base-dir="/tmp/kbox" --lang="c" 
 ```
 
 ## Run
@@ -35,10 +35,11 @@ kbox run --dir="/tmp/kbox" --cmd="/Main" --expected="hello" --input="hello" --ti
 OR, Docker
 
 ```bash
-docker run --rm -v "$PWD":/tmp/kbox si9ma/kbox:1.0 run --dir="/tmp/kbox" --cmd="/Main" --expected="hello" --input="hello" --timeout=1000 --memory=1000 --seccomp 
+docker run --privileged --rm -v "$PWD":/tmp/kbox si9ma/kbox:1.0 run --dir="/tmp/kbox" --cmd="/Main" --expected="hello" --input="hello" --timeout=1000 --memory=1000 --seccomp 
 ```
 
 ## TODO
 
 - [x] container
 - [ ] fix seccomp bug
+- [ ] fix docker cgroup bug

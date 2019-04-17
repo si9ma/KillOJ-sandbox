@@ -187,6 +187,7 @@ func (c *Container) initCommand() {
 	container := exec.Command("/proc/self/exe", args...)
 	container.Args[0] = os.Args[0]
 	container.Stderr = &c.stdErr
+	container.Stdout = os.Stdout
 	container.Stdin = os.Stdin
 	container.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWNS |
