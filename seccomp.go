@@ -1,17 +1,8 @@
 package main
 
-/*
-#include <seccomp.h>
-#include <stdint.h>
-
-uint64_t datum(char *str) {
-	return (scmp_datum_t)str;
-}
-*/
-import "C"
-
 import (
 	"fmt"
+	"os"
 
 	libseccomp "github.com/seccomp/libseccomp-golang"
 )
@@ -40,36 +31,63 @@ var seccompMap = map[string]*Seccomp{
 		Syscalls: []*Syscall{
 			{Name: "fork", Action: libseccomp.ActKill},
 			{Name: "vfork", Action: libseccomp.ActKill},
-			{Name: "kill", Action: libseccomp.ActKill},
 			{Name: "execveat", Action: libseccomp.ActKill},
+			{
+				Name:   "open",
+				Action: libseccomp.ActKill,
+				Conditions: []libseccomp.ScmpCondition{
+					{
+						Argument: 1,
+						Op:       libseccomp.CompareMaskedEqual,
+						Operand1: uint64(os.O_RDWR),
+						Operand2: uint64(os.O_RDWR),
+					},
+				},
+			},
+			{
+				Name:   "openat",
+				Action: libseccomp.ActKill,
+				Conditions: []libseccomp.ScmpCondition{
+					{
+						Argument: 2,
+						Op:       libseccomp.CompareMaskedEqual,
+						Operand1: uint64(os.O_RDWR),
+						Operand2: uint64(os.O_RDWR),
+					},
+				},
+			},
+			{
+				Name:   "open",
+				Action: libseccomp.ActKill,
+				Conditions: []libseccomp.ScmpCondition{
+					{
+						Argument: 1,
+						Op:       libseccomp.CompareMaskedEqual,
+						Operand1: uint64(os.O_WRONLY),
+						Operand2: uint64(os.O_WRONLY),
+					},
+				},
+			},
+			{
+				Name:   "openat",
+				Action: libseccomp.ActKill,
+				Conditions: []libseccomp.ScmpCondition{
+					{
+						Argument: 2,
+						Op:       libseccomp.CompareMaskedEqual,
+						Operand1: uint64(os.O_WRONLY),
+						Operand2: uint64(os.O_WRONLY),
+					},
+				},
+			},
 		},
 	},
 }
 
-// just allow execve when first argument is cmdStr
-func notAllowExecve(config, cmdStr string) {
-	fmt.Printf("address of cmdStr %p\n", &cmdStr)
-	syscall := &Syscall{
-		Name:   "execve",
-		Action: libseccomp.ActKill,
-		Conditions: []libseccomp.ScmpCondition{
-			{
-				Argument: 0,
-				Op:       libseccomp.CompareNotEqual,
-				Operand1: 78,
-			},
-		},
-	}
-
-	seccompMap[config].Syscalls = append(seccompMap[config].Syscalls, syscall)
-}
-
 func enableSeccomp(config, cmdStr string) (*libseccomp.ScmpFilter, error) {
-	fmt.Printf("address of cmdStr %p\n", &cmdStr)
 	if _, ok := seccompMap[config]; !ok {
 		return nil, fmt.Errorf("libseccomp:config %s is not exist", config)
 	}
-	notAllowExecve(config, cmdStr)
 	seccomp, _ := seccompMap[config]
 
 	// new filter
