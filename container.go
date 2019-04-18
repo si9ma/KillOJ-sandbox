@@ -60,20 +60,20 @@ var runCmd = cli.Command{
 	Action: func(ctx *cli.Context) error {
 		// create container
 		container := NewContainer(ctx)
-
-		// handle result
-		defer container.handleResult()
+		defer container.handleResult() // handle result
 
 		if container.err != nil {
-			return nil
+			return nil // error from NewContainer(ctx)
 		}
-
-		// delete cgroup
-		defer container.cgroup.Delete()
 
 		// input/dir/expected is required
 		if container.err = checkCmdStrArgsExist(ctx, []string{"input", "dir", "expected", "cmd"}); container.err != nil {
-			return nil // return nil, handle error by self
+			return nil // argument error,return nil, handle error by self
+		}
+
+		// delete cgroup
+		if container.cgroup != nil {
+			defer container.cgroup.Delete()
 		}
 
 		// start container

@@ -8,11 +8,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/si9ma/KillOJ-sandbox/lang"
 	"github.com/si9ma/KillOJ-sandbox/model"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
+
+var COMPILER_TIMEOUT_ERR error
+var COMPILER_RUN_ERR error
 
 var compileCmd = cli.Command{
 	Name:        "compile",
@@ -42,110 +44,136 @@ var compileCmd = cli.Command{
 		},
 	},
 	Action: func(ctx *cli.Context) error {
-		var err error
-		var result *model.CompileResult
+		compiler := NewCompiler(ctx)
+		defer compiler.handleResult()
 
-		// handle error and result
-		defer func() {
-			// not time limit error
-			// not compile error
-			if err != nil && result == nil {
-				result = &model.CompileResult{
-					Result: model.Result{
-						ResultType: model.CompileResType,
-						Status:     model.FAIL,
-						Errno:      model.OUTER_COMPILER_ERR,
-						Message:    err.Error(),
-					},
-				}
-			}
-
-			// success
-			if err == nil && result == nil {
-				result = &model.CompileResult{
-					Result: model.Result{
-						ResultType: model.CompileResType,
-						Status:     model.SUCCESS,
-						Message:    "compile success",
-					},
-				}
-			}
-
-			res, _ := json.Marshal(result)
-			fmt.Println(string(res))
-
-			// log result
-			log.WithFields(log.Fields{
-				"id":      ctx.GlobalString("id"),
-				"lang":    ctx.String("lang"),
-				"src":     ctx.String("src"),
-				"baseDir": ctx.String("dir"),
-				"timeout": ctx.String("timeout"),
-				"result":  result,
-			}).Info("compile result")
-		}()
+		if compiler.err != nil {
+			return nil // error from NewCompiler(ctx)
+		}
 
 		// lang/dir/src is required
-		if err = checkCmdStrArgsExist(ctx, []string{"lang", "dir", "src"}); err != nil {
+		if compiler.err = checkCmdStrArgsExist(ctx, []string{"lang", "dir", "src"}); compiler.err != nil {
 			return nil // return nil, handle error by self
 		}
-
-		var compiler *exec.Cmd
-		if compiler, err = getCompiler(ctx); err != nil {
-			return nil // return nil, handle error by self
-		}
-		var stdout, stderr bytes.Buffer
-		compiler.Stdout = &stdout
-		compiler.Stderr = &stderr
 
 		// compile time limit
-		timeout := ctx.Int("timeout")
-		time.AfterFunc(time.Duration(timeout)*time.Millisecond, func() {
-			// set time limit error result
-			result = &model.CompileResult{
-				Result: model.Result{
-					ResultType: model.CompileResType,
-					Status:     model.FAIL,
-					Errno:      model.COMPILE_TIME_LIMIT_ERR,
-					Message:    fmt.Sprintf("compile too long(limit %dms)", timeout),
-				},
+		time.AfterFunc(time.Duration(compiler.timeout)*time.Millisecond, func() {
+			if compiler.cmd.Process != nil {
+				COMPILER_TIMEOUT_ERR = fmt.Errorf("compile too long(limit %dms)", compiler.timeout)
+				compiler.err = COMPILER_TIMEOUT_ERR
+				_ = syscall.Kill(-compiler.cmd.Process.Pid, syscall.SIGKILL)
 			}
-
-			_ = syscall.Kill(-compiler.Process.Pid, syscall.SIGKILL)
 		})
 
-		if err := compiler.Run(); err != nil {
-			// if result not nil, it's time limit error
-			if result == nil {
-				result = &model.CompileResult{
-					Result: model.Result{
-						ResultType: model.CompileResType,
-						Status:     model.FAIL,
-						Errno:      model.INNER_COMPILER_ERR,
-						Message:    err.Error(),
-						StdErr:     stderr.String(),
-					},
-				}
-			}
+		if err := compiler.cmd.Run(); err != nil {
+			COMPILER_RUN_ERR = err
+			compiler.err = COMPILER_RUN_ERR
 		}
 
 		return nil // return nil, handle error by self
 	},
 }
 
-func getCompiler(ctx *cli.Context) (cmd *exec.Cmd, err error) {
-	langStr := ctx.String("lang")
-	baseDir := ctx.String("dir")
-	src := ctx.String("src")
+type Lang struct {
+	Command    string
+	SubCommand string
+	Args       []string
+}
 
-	if cmd, err = lang.GetCommand(langStr, src); err != nil {
-		return
+var langCompilerMap = map[string]Lang{
+	"c": {
+		Command: "/usr/bin/gcc",
+		Args:    []string{"-save-temps", "-std=c11", "-fmax-errors=10", "-static", "-o", "Main"},
+	},
+	"cpp": {
+		Command: "/usr/bin/g++",
+		Args:    []string{"-save-temps", "-std=c++11", "-fmax-errors=10", "-static", "-o", "Main"},
+	},
+	"go": {
+		Command:    "/usr/bin/go",
+		SubCommand: "build",
+		Args:       []string{"-o", "Main"},
+	},
+}
+
+type Compiler struct {
+	id      string
+	lang    string
+	err     error
+	cmd     *exec.Cmd // compiler cmd
+	baseDir string
+	src     string // source code file name
+	stdOut  bytes.Buffer
+	stdErr  bytes.Buffer
+	timeout int64 // timeout in ms
+}
+
+func NewCompiler(ctx *cli.Context) *Compiler {
+	compiler := &Compiler{
+		lang:    ctx.String("lang"),
+		baseDir: ctx.String("dir"),
+		src:     ctx.String("src"),
+		timeout: ctx.Int64("timeout"),
 	}
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{
+	if lang, ok := langCompilerMap[compiler.lang]; ok {
+		params := append(lang.Args, compiler.src)
+		// check if need sub cmd(eg: go build)
+		if lang.SubCommand != "" {
+			params = append([]string{lang.SubCommand}, params...)
+		}
+		compiler.cmd = exec.Command(lang.Command, params...)
+	} else {
+		compiler.err = fmt.Errorf("language %s is not supported", compiler.lang)
+		return compiler
+	}
+
+	compiler.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
-	cmd.Dir = baseDir
+	compiler.cmd.Dir = compiler.baseDir
+	compiler.cmd.Stdout = &compiler.stdOut
+	compiler.cmd.Stderr = &compiler.stdErr
 
-	return
+	return compiler
+}
+
+func (c *Compiler) handleResult() {
+	result := &model.CompileResult{
+		Result: model.Result{
+			ResultType: model.CompileResType,
+			StdErr:     c.stdErr.String(),
+		},
+	}
+
+	// handle error
+	if c.err != nil {
+		result.Message = c.err.Error()
+		result.Status = model.FAIL
+
+		switch c.err {
+		case COMPILER_TIMEOUT_ERR:
+			result.Errno = model.COMPILE_TIMEOUT
+		case COMPILER_RUN_ERR:
+			result.Errno = model.INNER_COMPILER_ERR
+		default:
+			result.Errno = model.OUTER_COMPILER_ERR
+		}
+	} else {
+		result.Status = model.SUCCESS
+		result.Message = "compile success"
+	}
+
+	res, _ := json.Marshal(result)
+	fmt.Println(string(res))
+
+	// log result
+	log.WithFields(log.Fields{
+		"id":      c.id,
+		"lang":    c.lang,
+		"src":     c.src,
+		"baseDir": c.baseDir,
+		"timeout": c.timeout,
+		"result":  result,
+	}).Info("compile result")
 }

@@ -17,7 +17,8 @@ import (
 	"github.com/urfave/cli"
 )
 
-var RUNERR error
+var APP_RUN_ERR error
+var APP_TIMEOUT_ERR error
 
 var initCmd = cli.Command{
 	Name:        "init",
@@ -61,7 +62,7 @@ var initCmd = cli.Command{
 	},
 	Action: func(ctx *cli.Context) error {
 		app := NewApp(ctx)
-		defer app.HandleResult()
+		defer app.handleResult()
 
 		// init namespace
 		if app.err = initNamespace(app.dir); app.err != nil {
@@ -84,19 +85,20 @@ var initCmd = cli.Command{
 			scmpFilter.Release()
 		}
 
-		// time limit
+		// time out
 		time.AfterFunc(time.Duration(app.timeout)*time.Millisecond, func() {
 			if app.command.Process != nil {
-				// use SIGUSR1 as time limit kill signal
-				_ = syscall.Kill(-app.command.Process.Pid, syscall.SIGUSR1)
+				APP_TIMEOUT_ERR = fmt.Errorf("Time Out")
+				app.err = APP_TIMEOUT_ERR
+				_ = syscall.Kill(-app.command.Process.Pid, syscall.SIGKILL)
 			}
 		})
 
 		// run app and calculate time
 		startTime := time.Now().UnixNano() / int64(time.Millisecond)
 		if app.err = app.command.Run(); app.err != nil {
-			RUNERR = fmt.Errorf("%s", app.err.Error())
-			app.err = RUNERR
+			APP_RUN_ERR = fmt.Errorf("%s", app.err.Error())
+			app.err = APP_RUN_ERR
 		}
 		endTime := time.Now().UnixNano() / int64(time.Millisecond)
 		app.timeCost = endTime - startTime
@@ -142,7 +144,7 @@ func NewApp(ctx *cli.Context) *App {
 	return app
 }
 
-func (app *App) HandleResult() {
+func (app *App) handleResult() {
 	result := model.RunResult{
 		Result: model.Result{
 			ID:         app.id,
@@ -165,7 +167,7 @@ func (app *App) HandleResult() {
 
 	// error is not nil or exit status is not 0
 	if app.err != nil || app.processStarted && app.waitStatus.ExitStatus() != 0 {
-		app.HandleError(&result)
+		app.handleError(&result)
 	} else {
 		// success
 		if result.Output == result.Expected {
@@ -177,10 +179,10 @@ func (app *App) HandleResult() {
 		}
 	}
 
-	app.Log(result)
+	app.log(result)
 }
 
-func (app *App) Log(result model.RunResult) {
+func (app *App) log(result model.RunResult) {
 	resultStr, _ := json.Marshal(result)
 	fmt.Println(string(resultStr))
 
@@ -199,7 +201,7 @@ func (app *App) Log(result model.RunResult) {
 
 }
 
-func (app *App) HandleError(result *model.RunResult) {
+func (app *App) handleError(result *model.RunResult) {
 	result.Status = model.FAIL
 
 	// handle kill signal
@@ -208,9 +210,6 @@ func (app *App) HandleError(result *model.RunResult) {
 		case syscall.SIGSYS:
 			result.Errno = model.BAD_SYSTEMCALL
 			result.Message = "Bad System Call"
-		case syscall.SIGUSR1:
-			result.Errno = model.TIMEOUT
-			result.Message = "Time Out"
 		case syscall.SIGKILL: // kill by oomkiller
 			result.Errno = model.OUT_OF_MEMORY
 			result.Message = "out of memory"
@@ -222,17 +221,14 @@ func (app *App) HandleError(result *model.RunResult) {
 
 NotSigned:
 
-	// container error
-	if app.err != nil && app.err != RUNERR {
-		result.Errno = model.CONTAINER_ERR
-		result.Message = app.err.Error()
-		return
-	}
-
-	if app.err == RUNERR {
+	result.Message = app.err.Error()
+	switch app.err {
+	case APP_TIMEOUT_ERR:
+		result.Errno = model.TIMEOUT
+	case APP_RUN_ERR:
 		result.Errno = model.APP_ERR
-		result.Message = app.err.Error()
-		return
+	default:
+		result.Errno = model.CONTAINER_ERR
 	}
 }
 
