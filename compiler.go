@@ -94,6 +94,10 @@ var langCompilerMap = map[string]Lang{
 		SubCommand: "build",
 		Args:       []string{"-o", "Main"},
 	},
+	"java": {
+		Command: "/usr/bin/javac",
+		Args:    []string{"-J-Xmx500m", "-Xmaxwarns", "10", "-Xmaxerrs", "10"}, // heap memory limit to 500m, max error and warn limit to 10
+	},
 }
 
 type Compiler struct {
