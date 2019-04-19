@@ -111,13 +111,13 @@ type JavaContainer struct {
 
 func NewJavaContainer(ctx *cli.Context) *JavaContainer {
 	javaContainer := &JavaContainer{
-		id:       ctx.GlobalString("id"),
-		baseDir:  ctx.String("dir"),
+		id:       getGlbString(ctx, "id"),
+		baseDir:  getString(ctx, "dir"),
 		timeout:  ctx.Int64("timeout"),
 		memory:   ctx.Int64("memory"),
-		class:    ctx.String("class"),
-		expected: ctx.String("expected"),
-		input:    ctx.String("input"),
+		class:    getString(ctx, "class"),
+		expected: getString(ctx, "expected"),
+		input:    getString(ctx, "input"),
 	}
 
 	// write security.policy file
@@ -175,8 +175,17 @@ func (j *JavaContainer) handleResult() {
 			result.Errno = model.RUNNER_ERR
 		}
 	} else {
-		result.Status = model.SUCCESS
-		result.Message = "success"
+		ex := []byte(result.Expected)
+		out := []byte(result.Output)
+		fmt.Println(ex, out)
+		if result.Expected == result.Output {
+			result.Status = model.SUCCESS
+			result.Message = "success"
+		} else {
+			result.Status = model.FAIL
+			result.Errno = model.UNEXPECTED_RES_ERR
+			result.Message = "output is unexpected"
+		}
 	}
 
 	res, _ := json.Marshal(result)

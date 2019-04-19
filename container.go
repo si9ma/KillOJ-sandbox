@@ -114,14 +114,14 @@ type Container struct {
 
 func NewContainer(ctx *cli.Context) *Container {
 	container := &Container{
-		id:       ctx.GlobalString("id"),
-		input:    ctx.String("input"),
-		baseDir:  ctx.String("dir"),
-		expected: ctx.String("expected"),
+		id:       getGlbString(ctx, "id"),
+		input:    getString(ctx, "input"),
+		baseDir:  getString(ctx, "dir"),
+		expected: getString(ctx, "expected"),
 		timeout:  ctx.Int64("timeout"),
 		memory:   ctx.Int64("memory") + MemoryUsedByContainer,
 		scmp:     ctx.Bool("seccomp"),
-		cmdStr:   ctx.String("cmd"),
+		cmdStr:   getString(ctx, "cmd"),
 	}
 
 	container.initCommand()

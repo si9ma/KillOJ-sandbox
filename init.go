@@ -128,14 +128,14 @@ type App struct {
 
 func NewApp(ctx *cli.Context) *App {
 	app := &App{
-		id:       ctx.GlobalString("id"),
-		input:    ctx.String("input"),
-		dir:      ctx.String("dir"),
-		expected: ctx.String("expected"),
+		id:       getGlbString(ctx, "id"),
+		input:    getString(ctx, "input"),
+		dir:      getString(ctx, "dir"),
+		expected: getString(ctx, "expected"),
 		timeout:  ctx.Int64("timeout"),
 		memory:   ctx.Uint64("memory") + MemoryUsedByContainer,
 		scmp:     ctx.Bool("seccomp"),
-		cmdStr:   ctx.String("cmd"),
+		cmdStr:   getString(ctx, "cmd"),
 	}
 
 	app.initCommand()
