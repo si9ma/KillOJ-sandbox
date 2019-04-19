@@ -50,6 +50,7 @@ func main() {
 		compileCmd,
 		runCmd,
 		initCmd,
+		javaCmd,
 	}
 
 	app.Before = func(context *cli.Context) error {

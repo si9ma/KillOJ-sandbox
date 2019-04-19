@@ -51,12 +51,12 @@ var initCmd = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "timeout",
-			Value: 2000,
+			Value: 6000,
 			Usage: "timeout limitation in milliseconds",
 		},
 		cli.IntFlag{
 			Name:  "memory",
-			Value: 256,
+			Value: 256 * 1024,
 			Usage: "memory limitation in KB",
 		},
 	},
@@ -172,6 +172,7 @@ func (app *App) handleResult() {
 		// success
 		if result.Output == result.Expected {
 			result.Status = model.SUCCESS
+			result.Message = "success"
 		} else {
 			result.Status = model.FAIL
 			result.Errno = model.UNEXPECTED_RES_ERR
@@ -224,7 +225,7 @@ NotSigned:
 	result.Message = app.err.Error()
 	switch app.err {
 	case APP_TIMEOUT_ERR:
-		result.Errno = model.TIMEOUT
+		result.Errno = model.RUN_TIMEOUT
 	case APP_RUN_ERR:
 		result.Errno = model.APP_ERR
 	default:

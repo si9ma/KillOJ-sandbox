@@ -48,12 +48,12 @@ var runCmd = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "timeout",
-			Value: 2000,
+			Value: 6000,
 			Usage: "timeout limitation in milliseconds",
 		},
 		cli.IntFlag{
 			Name:  "memory",
-			Value: 256,
+			Value: 256 * 1024,
 			Usage: "memory limitation in KB",
 		},
 	},

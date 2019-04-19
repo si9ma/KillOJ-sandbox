@@ -39,7 +39,7 @@ var compileCmd = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "timeout",
-			Value: 100000,
+			Value: 60000,
 			Usage: "compile timeout in milliseconds",
 		},
 	},
@@ -114,6 +114,7 @@ type Compiler struct {
 
 func NewCompiler(ctx *cli.Context) *Compiler {
 	compiler := &Compiler{
+		id:      ctx.String("id"),
 		lang:    ctx.String("lang"),
 		baseDir: ctx.String("dir"),
 		src:     ctx.String("src"),
@@ -145,6 +146,7 @@ func NewCompiler(ctx *cli.Context) *Compiler {
 func (c *Compiler) handleResult() {
 	result := &model.CompileResult{
 		Result: model.Result{
+			ID:         c.id,
 			ResultType: model.CompileResType,
 			StdErr:     c.stdErr.String(),
 		},
