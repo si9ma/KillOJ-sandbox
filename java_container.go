@@ -175,9 +175,6 @@ func (j *JavaContainer) handleResult() {
 			result.Errno = model.RUNNER_ERR
 		}
 	} else {
-		ex := []byte(result.Expected)
-		out := []byte(result.Output)
-		fmt.Println(ex, out)
 		if result.Expected == result.Output {
 			result.Status = model.SUCCESS
 			result.Message = "success"
