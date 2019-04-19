@@ -111,7 +111,7 @@ type JavaContainer struct {
 
 func NewJavaContainer(ctx *cli.Context) *JavaContainer {
 	javaContainer := &JavaContainer{
-		id:       ctx.String("id"),
+		id:       ctx.GlobalString("id"),
 		baseDir:  ctx.String("dir"),
 		timeout:  ctx.Int64("timeout"),
 		memory:   ctx.Int64("memory"),

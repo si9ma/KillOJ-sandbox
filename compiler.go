@@ -114,7 +114,7 @@ type Compiler struct {
 
 func NewCompiler(ctx *cli.Context) *Compiler {
 	compiler := &Compiler{
-		id:      ctx.String("id"),
+		id:      ctx.GlobalString("id"),
 		lang:    ctx.String("lang"),
 		baseDir: ctx.String("dir"),
 		src:     ctx.String("src"),

@@ -13,7 +13,6 @@ import (
 
 	libseccomp "github.com/seccomp/libseccomp-golang"
 	"github.com/si9ma/KillOJ-sandbox/model"
-	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -180,26 +179,8 @@ func (app *App) handleResult() {
 		}
 	}
 
-	app.log(result)
-}
-
-func (app *App) log(result model.RunResult) {
 	resultStr, _ := json.Marshal(result)
 	fmt.Println(string(resultStr))
-
-	// log result
-	log.WithFields(log.Fields{
-		"id":       app.id,
-		"input":    app.input,
-		"baseDir":  app.dir,
-		"memory":   app.memory,
-		"timeout":  app.timeout,
-		"scmp":     app.scmp,
-		"expected": app.expected,
-		"cmdStr":   app.cmdStr,
-		"result":   result,
-	}).Info("app result")
-
 }
 
 func (app *App) handleError(result *model.RunResult) {

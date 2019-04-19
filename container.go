@@ -106,6 +106,7 @@ type Container struct {
 	cmdStr     string // command path
 	command    *exec.Cmd
 	stdErr     bytes.Buffer
+	stdOut     bytes.Buffer
 	cgroup     *cgroups.Cgroup
 	waitStatus syscall.WaitStatus
 	done       bool // is container done
@@ -161,12 +162,14 @@ func (c *Container) handleResult() {
 			result.Errno = model.RUNNER_ERR
 			result.Message = c.err.Error()
 		}
-
-		// print result just when error
-		// success result come from container
-		res, _ := json.Marshal(result)
-		fmt.Println(string(res))
+	} else {
+		// result come from container
+		resStr := c.stdOut.String()
+		_ = json.Unmarshal([]byte(resStr), &result) // todo There might be a bug here
 	}
+
+	res, _ := json.Marshal(result)
+	fmt.Print(string(res))
 
 	// log result
 	log.WithFields(log.Fields{
@@ -187,7 +190,7 @@ func (c *Container) initCommand() {
 	container := exec.Command("/proc/self/exe", args...)
 	container.Args[0] = os.Args[0]
 	container.Stderr = &c.stdErr
-	container.Stdout = os.Stdout
+	container.Stdout = &c.stdOut
 	container.Stdin = os.Stdin
 	container.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWNS |
@@ -255,14 +258,22 @@ func (c *Container) initCGroup(memswLimit int64) error {
 }
 
 func getInitArgs() []string {
-	args := os.Args
-	for i, arg := range args {
-		// replace command
+	args := []string{}
+	for i, arg := range os.Args {
+		// append --id
+		if arg == "--id" {
+			args = append(args, os.Args[i], os.Args[i+1])
+		}
+
+		// replace run as init
+		// append params all left
 		if arg == "run" {
-			args[i] = "init"
+			params := os.Args[i:]
+			params[0] = "init"
+			args = append(args, params...)
+			break
 		}
 	}
 
-	// remove args[0]
-	return args[1:]
+	return args
 }
