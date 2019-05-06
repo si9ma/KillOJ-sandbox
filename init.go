@@ -11,8 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/si9ma/KillOJ-common/judge"
+
 	libseccomp "github.com/seccomp/libseccomp-golang"
-	"github.com/si9ma/KillOJ-sandbox/model"
 	"github.com/urfave/cli"
 )
 
@@ -113,7 +114,7 @@ type App struct {
 	dir            string // base dir
 	expected       string // expected of test case
 	timeout        int64  // timeout limit in ms
-	memory         uint64 // memory limit in KB
+	memLimit       int64  // memory limit in KB
 	scmp           bool   // enable sccomp
 	cmdStr         string // command of app
 	command        *exec.Cmd
@@ -133,7 +134,7 @@ func NewApp(ctx *cli.Context) *App {
 		dir:      getString(ctx, "dir"),
 		expected: getString(ctx, "expected"),
 		timeout:  ctx.Int64("timeout"),
-		memory:   ctx.Uint64("memory") + MemoryUsedByContainer,
+		memLimit: ctx.Int64("memory"),
 		scmp:     ctx.Bool("seccomp"),
 		cmdStr:   getString(ctx, "cmd"),
 	}
@@ -144,16 +145,16 @@ func NewApp(ctx *cli.Context) *App {
 }
 
 func (app *App) handleResult() {
-	result := model.RunResult{
-		Result: model.Result{
-			ID:         app.id,
-			ResultType: model.RunResType,
-			StdErr:     app.stdErr.String(),
-		},
-		Runtime:  app.timeCost,
-		Input:    app.input,
-		Output:   app.stdOut.String(),
-		Expected: app.expected,
+	result := judge.InnerResult{
+		ID:         app.id,
+		ResultType: judge.RunResType,
+		StdErr:     app.stdErr.String(),
+		Runtime:    app.timeCost,
+		Input:      app.input,
+		Output:     app.stdOut.String(),
+		Expected:   app.expected,
+		TimeLimit:  app.timeout,
+		MemLimit:   app.memLimit,
 	}
 
 	// get rusage and wait status info
@@ -170,12 +171,12 @@ func (app *App) handleResult() {
 	} else {
 		// success
 		if result.Output == result.Expected {
-			result.Status = model.SUCCESS
-			result.Message = "success"
+			result.Status = judge.SUCCESS
+			result.Message = judge.GetRunSuccessMsg()
 		} else {
-			result.Status = model.FAIL
-			result.Errno = model.UNEXPECTED_RES_ERR
-			result.Message = "output is unexpected"
+			result.Status = judge.FAIL
+			result.Errno = judge.WRONG_ANSWER_ERR
+			result.Message = judge.GetInnerErrorMsgByErrNo(judge.WRONG_ANSWER_ERR)
 		}
 	}
 
@@ -183,18 +184,18 @@ func (app *App) handleResult() {
 	fmt.Println(string(resultStr))
 }
 
-func (app *App) handleError(result *model.RunResult) {
-	result.Status = model.FAIL
+func (app *App) handleError(result *judge.InnerResult) {
+	result.Status = judge.FAIL
 
 	// handle kill signal
 	if app.processStarted && app.waitStatus.ExitStatus() != 0 {
 		switch app.waitStatus.Signal() {
 		case syscall.SIGSYS:
-			result.Errno = model.BAD_SYSTEMCALL
-			result.Message = "Bad System Call"
+			result.Errno = judge.BAD_SYSTEMCALL_ERR
+			result.Message = judge.GetInnerErrorMsgByErrNo(judge.BAD_SYSTEMCALL_ERR)
 		case syscall.SIGKILL: // kill by oomkiller
-			result.Errno = model.OUT_OF_MEMORY
-			result.Message = "out of memory"
+			result.Errno = judge.OUT_OF_MEMORY_ERR
+			result.Message = judge.GetInnerErrorMsgByErrNo(judge.OUT_OF_MEMORY_ERR)
 		default:
 			goto NotSigned
 		}
@@ -206,11 +207,11 @@ NotSigned:
 	result.Message = app.err.Error()
 	switch app.err {
 	case APP_TIMEOUT_ERR:
-		result.Errno = model.RUN_TIMEOUT
+		result.Errno = judge.RUN_TIMEOUT_ERR
 	case APP_RUN_ERR:
-		result.Errno = model.APP_ERR
+		result.Errno = judge.APP_ERR
 	default:
-		result.Errno = model.CONTAINER_ERR
+		result.Errno = judge.CONTAINER_ERR
 	}
 }
 

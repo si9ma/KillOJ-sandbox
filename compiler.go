@@ -8,7 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/si9ma/KillOJ-sandbox/model"
+	"github.com/si9ma/KillOJ-common/judge"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -144,30 +145,30 @@ func NewCompiler(ctx *cli.Context) *Compiler {
 }
 
 func (c *Compiler) handleResult() {
-	result := &model.CompileResult{
-		Result: model.Result{
-			ID:         c.id,
-			ResultType: model.CompileResType,
-			StdErr:     c.stdErr.String(),
-		},
+	result := &judge.InnerResult{
+		ID:         c.id,
+		ResultType: judge.CompileResType,
+		StdErr:     c.stdErr.String(),
+		TimeLimit:  c.timeout,
 	}
 
 	// handle error
 	if c.err != nil {
 		result.Message = c.err.Error()
-		result.Status = model.FAIL
+		result.Status = judge.FAIL
 
 		switch c.err {
 		case COMPILER_TIMEOUT_ERR:
-			result.Errno = model.COMPILE_TIMEOUT
+			result.Errno = judge.COMPILE_TIMEOUT
+			result.Message = judge.GetInnerErrorMsgByErrNo(judge.COMPILE_TIMEOUT)
 		case COMPILER_RUN_ERR:
-			result.Errno = model.INNER_COMPILER_ERR
+			result.Errno = judge.INNER_COMPILER_ERR
 		default:
-			result.Errno = model.OUTER_COMPILER_ERR
+			result.Errno = judge.OUTER_COMPILER_ERR
 		}
 	} else {
-		result.Status = model.SUCCESS
-		result.Message = "compile success"
+		result.Status = judge.SUCCESS
+		result.Message = judge.GetCompileSuccessMsg()
 	}
 
 	res, _ := json.Marshal(result)

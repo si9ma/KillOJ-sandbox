@@ -11,7 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/si9ma/KillOJ-sandbox/model"
+	"github.com/si9ma/KillOJ-common/judge"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -94,30 +95,30 @@ var javaCmd = cli.Command{
 }
 
 type JavaContainer struct {
-	id         string
-	err        error
-	cmd        *exec.Cmd // compiler cmd
-	class      string
-	baseDir    string
-	stdOut     bytes.Buffer
-	stdErr     bytes.Buffer
-	timeout    int64 // timeout in ms
-	memory     int64
-	memoryCost int64  // memory usage in KB
-	timeCost   int64  // time usage in ms
-	input      string // input of test case
-	expected   string // expected of test case
+	id          string
+	err         error
+	cmd         *exec.Cmd // compiler cmd
+	class       string
+	baseDir     string
+	stdOut      bytes.Buffer
+	stdErr      bytes.Buffer
+	timeout     int64 // timeout in ms
+	memoryLimit int64
+	memoryCost  int64  // memory usage in KB
+	timeCost    int64  // time usage in ms
+	input       string // input of test case
+	expected    string // expected of test case
 }
 
 func NewJavaContainer(ctx *cli.Context) *JavaContainer {
 	javaContainer := &JavaContainer{
-		id:       getGlbString(ctx, "id"),
-		baseDir:  getString(ctx, "dir"),
-		timeout:  ctx.Int64("timeout"),
-		memory:   ctx.Int64("memory"),
-		class:    getString(ctx, "class"),
-		expected: getString(ctx, "expected"),
-		input:    getString(ctx, "input"),
+		id:          getGlbString(ctx, "id"),
+		baseDir:     getString(ctx, "dir"),
+		timeout:     ctx.Int64("timeout"),
+		memoryLimit: ctx.Int64("memory"),
+		class:       getString(ctx, "class"),
+		expected:    getString(ctx, "expected"),
+		input:       getString(ctx, "input"),
 	}
 
 	// write security.policy file
@@ -129,7 +130,7 @@ func NewJavaContainer(ctx *cli.Context) *JavaContainer {
 	args := []string{
 		"-Djava.security.manager",
 		"-Djava.security.policy==" + securityPolicyFile,
-		"-Xmx" + strconv.FormatInt(javaContainer.memory, 10) + "k", // limit memory
+		"-Xmx" + strconv.FormatInt(javaContainer.memoryLimit, 10) + "k", // limit memory
 		javaContainer.class,
 	}
 	javaContainer.cmd = exec.Command("/usr/bin/java", args...)
@@ -145,16 +146,16 @@ func NewJavaContainer(ctx *cli.Context) *JavaContainer {
 }
 
 func (j *JavaContainer) handleResult() {
-	result := &model.RunResult{
-		Result: model.Result{
-			ID:         j.id,
-			ResultType: model.RunResType,
-			StdErr:     j.stdErr.String(),
-		},
-		Runtime:  j.timeCost,
-		Input:    j.input,
-		Expected: j.expected,
-		Output:   j.stdOut.String(),
+	result := &judge.InnerResult{
+		ID:         j.id,
+		ResultType: judge.RunResType,
+		StdErr:     j.stdErr.String(),
+		Runtime:    j.timeCost,
+		Input:      j.input,
+		Expected:   j.expected,
+		Output:     j.stdOut.String(),
+		TimeLimit:  j.timeout,
+		MemLimit:   j.memoryLimit,
 	}
 
 	if j.cmd.ProcessState != nil {
@@ -164,24 +165,24 @@ func (j *JavaContainer) handleResult() {
 	// handle error
 	if j.err != nil {
 		result.Message = j.err.Error()
-		result.Status = model.FAIL
+		result.Status = judge.FAIL
 
 		switch j.err {
 		case APP_TIMEOUT_ERR:
-			result.Errno = model.RUN_TIMEOUT
+			result.Errno = judge.RUN_TIMEOUT_ERR
 		case APP_RUN_ERR:
 			j.handleAppError(result)
 		default:
-			result.Errno = model.RUNNER_ERR
+			result.Errno = judge.RUNNER_ERR
 		}
 	} else {
 		if result.Expected == result.Output {
-			result.Status = model.SUCCESS
-			result.Message = "success"
+			result.Status = judge.SUCCESS
+			result.Message = judge.GetRunSuccessMsg()
 		} else {
-			result.Status = model.FAIL
-			result.Errno = model.UNEXPECTED_RES_ERR
-			result.Message = "output is unexpected"
+			result.Status = judge.FAIL
+			result.Errno = judge.WRONG_ANSWER_ERR
+			result.Message = judge.GetInnerErrorMsgByErrNo(judge.WRONG_ANSWER_ERR)
 		}
 	}
 
@@ -193,7 +194,7 @@ func (j *JavaContainer) handleResult() {
 		"id":       j.id,
 		"input":    j.input,
 		"baseDir":  j.baseDir,
-		"memory":   j.memory,
+		"memLimit": j.memoryLimit,
 		"timeout":  j.timeout,
 		"expected": j.expected,
 		"class":    j.class,
@@ -201,21 +202,21 @@ func (j *JavaContainer) handleResult() {
 	}).Info("run result")
 }
 
-func (j *JavaContainer) handleAppError(result *model.RunResult) {
+func (j *JavaContainer) handleAppError(result *judge.InnerResult) {
 	out := j.stdOut.String()
 	err := j.stdErr.String()
 
 	if strings.Contains(out, javaMemoryLimitMsg) {
-		result.Errno = model.OUT_OF_MEMORY
-		result.Message = "out of memory"
+		result.Errno = judge.OUT_OF_MEMORY_ERR
+		result.Message = judge.GetInnerErrorMsgByErrNo(judge.OUT_OF_MEMORY_ERR)
 		return
 	}
 
 	if strings.Contains(err, javaSecurityManagerMsg) {
-		result.Errno = model.JAVA_SECURITY_MANAGER_ERR
-		result.Message = "security manager access denied"
+		result.Errno = judge.JAVA_SECURITY_MANAGER_ERR
+		result.Message = judge.GetInnerErrorMsgByErrNo(judge.JAVA_SECURITY_MANAGER_ERR)
 		return
 	}
 
-	result.Errno = model.APP_ERR
+	result.Errno = judge.APP_ERR
 }
