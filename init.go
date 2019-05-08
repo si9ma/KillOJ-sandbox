@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/si9ma/KillOJ-common/tip"
+
 	"github.com/si9ma/KillOJ-common/judge"
 
 	libseccomp "github.com/seccomp/libseccomp-golang"
@@ -172,7 +174,7 @@ func (app *App) handleResult() {
 		// success
 		if result.Output == result.Expected {
 			result.Status = judge.SUCCESS
-			result.Message = judge.GetRunSuccessMsg()
+			result.Message = tip.RunSuccessTip.String()
 		} else {
 			result.Status = judge.FAIL
 			result.Errno = judge.WRONG_ANSWER_ERR

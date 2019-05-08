@@ -15,6 +15,36 @@
 			"revisionTime": "2017-09-21T03:16:16Z"
 		},
 		{
+			"checksumSHA1": "Q3BrhdY7WRkFv8/eSqID+xG9zNE=",
+			"path": "github.com/si9ma/KillOJ-common/codelang",
+			"revision": "0fa1c01c73f38519c1c1346ccde41b2861efe2a2",
+			"revisionTime": "2019-05-08T00:10:08Z"
+		},
+		{
+			"checksumSHA1": "dHQszCjQZXNM2TVMkIv8QqgxXE0=",
+			"path": "github.com/si9ma/KillOJ-common/constants",
+			"revision": "0fa1c01c73f38519c1c1346ccde41b2861efe2a2",
+			"revisionTime": "2019-05-08T00:10:08Z"
+		},
+		{
+			"checksumSHA1": "PI1k5NwBtlgv1ihkWf08el/ZyYE=",
+			"path": "github.com/si9ma/KillOJ-common/judge",
+			"revision": "0fa1c01c73f38519c1c1346ccde41b2861efe2a2",
+			"revisionTime": "2019-05-08T00:10:08Z"
+		},
+		{
+			"checksumSHA1": "JQ1usNf9UPhGztk0kCcLuyDVCRU=",
+			"path": "github.com/si9ma/KillOJ-common/lang",
+			"revision": "0fa1c01c73f38519c1c1346ccde41b2861efe2a2",
+			"revisionTime": "2019-05-08T00:10:08Z"
+		},
+		{
+			"checksumSHA1": "ls3AEoHbBhUpqN91gbm1d2wWWeA=",
+			"path": "github.com/si9ma/KillOJ-common/tip",
+			"revision": "0fa1c01c73f38519c1c1346ccde41b2861efe2a2",
+			"revisionTime": "2019-05-08T00:10:08Z"
+		},
+		{
 			"checksumSHA1": "mB5o9lbse489BCvZGbRkarc2Xp0=",
 			"path": "github.com/sirupsen/logrus",
 			"revision": "9b3cdde74fbe9443d704467498a7dcb61a79de9b",
@@ -31,6 +61,30 @@
 			"path": "golang.org/x/sys/unix",
 			"revision": "4b34438f7a67ee5f45cc6132e2bad873a20324e9",
 			"revisionTime": "2019-04-05T15:09:22Z"
+		},
+		{
+			"checksumSHA1": "8ea1h1pimPfXc6cE5l3SQTe7SVo=",
+			"path": "golang.org/x/text/internal/language",
+			"revision": "f4905fbd45b6790792202848439271c74074bbfd",
+			"revisionTime": "2019-04-10T00:12:53Z"
+		},
+		{
+			"checksumSHA1": "GxBlFOqWoIsWCMswUHh6dUqM5no=",
+			"path": "golang.org/x/text/internal/language/compact",
+			"revision": "f4905fbd45b6790792202848439271c74074bbfd",
+			"revisionTime": "2019-04-10T00:12:53Z"
+		},
+		{
+			"checksumSHA1": "hyNCcTwMQnV6/MK8uUW9E5H0J0M=",
+			"path": "golang.org/x/text/internal/tag",
+			"revision": "f4905fbd45b6790792202848439271c74074bbfd",
+			"revisionTime": "2019-04-10T00:12:53Z"
+		},
+		{
+			"checksumSHA1": "kgODOZdRLWKSppiHzrqOKdtrGHA=",
+			"path": "golang.org/x/text/language",
+			"revision": "f4905fbd45b6790792202848439271c74074bbfd",
+			"revisionTime": "2019-04-10T00:12:53Z"
 		}
 	],
 	"rootPath": "github.com/si9ma/KillOJ-sandbox"

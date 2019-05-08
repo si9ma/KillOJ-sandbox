@@ -8,6 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/si9ma/KillOJ-common/codelang"
+
+	"github.com/si9ma/KillOJ-common/tip"
+
 	"github.com/si9ma/KillOJ-common/judge"
 
 	log "github.com/sirupsen/logrus"
@@ -82,20 +86,20 @@ type Lang struct {
 }
 
 var langCompilerMap = map[string]Lang{
-	"c": {
+	codelang.LangC.Name: {
 		Command: "/usr/bin/gcc",
 		Args:    []string{"-save-temps", "-std=c11", "-fmax-errors=10", "-static", "-o", "Main"},
 	},
-	"cpp": {
+	codelang.LangCPP.Name: {
 		Command: "/usr/bin/g++",
 		Args:    []string{"-save-temps", "-std=c++11", "-fmax-errors=10", "-static", "-o", "Main"},
 	},
-	"go": {
+	codelang.LangGo.Name: {
 		Command:    "/usr/bin/go",
 		SubCommand: "build",
 		Args:       []string{"-o", "Main"},
 	},
-	"java": {
+	codelang.LangJava.Name: {
 		Command: "/usr/bin/javac",
 		Args:    []string{"-J-Xmx500m", "-Xmaxwarns", "10", "-Xmaxerrs", "10"}, // heap memory limit to 500m, max error and warn limit to 10
 	},
@@ -168,7 +172,7 @@ func (c *Compiler) handleResult() {
 		}
 	} else {
 		result.Status = judge.SUCCESS
-		result.Message = judge.GetCompileSuccessMsg()
+		result.Message = tip.CompileSuccessTip.String()
 	}
 
 	res, _ := json.Marshal(result)

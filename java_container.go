@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/si9ma/KillOJ-common/tip"
+
 	"github.com/si9ma/KillOJ-common/judge"
 
 	log "github.com/sirupsen/logrus"
@@ -178,7 +180,7 @@ func (j *JavaContainer) handleResult() {
 	} else {
 		if result.Expected == result.Output {
 			result.Status = judge.SUCCESS
-			result.Message = judge.GetRunSuccessMsg()
+			result.Message = tip.RunSuccessTip.String()
 		} else {
 			result.Status = judge.FAIL
 			result.Errno = judge.WRONG_ANSWER_ERR

@@ -41,10 +41,6 @@ func main() {
 			Name:  "id",
 			Usage: "id of this deal",
 		},
-		cli.BoolFlag{
-			Name:  "json-res",
-			Usage: "return result as json",
-		},
 	}
 	app.Commands = []cli.Command{
 		compileCmd,
