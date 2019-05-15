@@ -90,7 +90,7 @@ var initCmd = cli.Command{
 		// time out
 		time.AfterFunc(time.Duration(app.timeout)*time.Millisecond, func() {
 			if app.command.Process != nil {
-				APP_TIMEOUT_ERR = fmt.Errorf("Time Out")
+				APP_TIMEOUT_ERR = fmt.Errorf(judge.GetInnerErrorMsgByErrNo(judge.RUN_TIMEOUT_ERR))
 				app.err = APP_TIMEOUT_ERR
 				_ = syscall.Kill(-app.command.Process.Pid, syscall.SIGKILL)
 			}

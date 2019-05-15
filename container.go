@@ -236,9 +236,9 @@ func (c *Container) initCGroup(memswLimit int64) error {
 	var kernelMem int64 = 64 * 1024 // 64m
 	var disableOOMKiller = false    // kill process when oom
 
-	// 7 pid at most
+	// 30 pid at most
 	// limit number of process to avoid fork bomb
-	var pidsLimit int64 = 10
+	var pidsLimit int64 = 30
 	var swappiness int64 = 0
 	cgroup, err := cgroups.New(path, cgroups.Resource{
 		CPU: &cgroups.CPU{

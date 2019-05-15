@@ -78,7 +78,7 @@ var javaCmd = cli.Command{
 
 		time.AfterFunc(time.Duration(javaContainer.timeout)*time.Millisecond, func() {
 			if javaContainer.cmd.Process != nil {
-				APP_TIMEOUT_ERR = fmt.Errorf("Time Out")
+				APP_TIMEOUT_ERR = fmt.Errorf(judge.GetInnerErrorMsgByErrNo(judge.RUN_TIMEOUT_ERR))
 				javaContainer.err = APP_TIMEOUT_ERR
 				_ = syscall.Kill(-javaContainer.cmd.Process.Pid, syscall.SIGKILL)
 			}
